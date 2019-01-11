@@ -1,0 +1,119 @@
+{{ define "content" }}
+
+<div class="container">
+
+
+        <div class="jumbotron">
+            <h1 class="display-4">Projects</h1>
+            <p class="lead">I like to do stuff on my on for fun, this is my main stuff</p>
+            <hr class="my-4">
+            <p>All the project are store on my github account this is just more information about my biggest personal project not every repository will be listed here.</p>
+
+            <div class="card">
+                <div class="col-auto" style="padding: 5px">
+                    <img src={{ .ghaccount.ImgURL }} class="img-thumbnail mx-auto d-block rounded-circle" alt="" height="100" width="100">
+                    <div class="card-block px-2">
+                        <h3 class="card-title">GitHub Account <a href={{.ghaccount.URL}}>{{.ghaccount.Name }}</a></h3>
+                        <p class="lead">
+                            <img src="/static/icons/octicons/location.svg" alt=""> Location <b>{{.ghaccount.Location}}</b>
+                        </p>
+                        <p class="lead">
+                            <img src="/static/icons/octicons/mail.svg" alt=""> Email  <b>{{.ghaccount.Email}}</b>
+                        </p>
+                        <p class="lead">
+                            {{.ghaccount.Bio}}
+                        </p>
+                    </div>
+
+                    <div class="card-block">
+                        <ul class="list-group">
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <img src="/static/icons/octicons/repo.svg" alt=""> Public repository
+                                <span class="badge badge-secondary">{{.ghaccount.NbrPublicRepo}}</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <img src="/static/icons/octicons/logo-gist.svg" alt=""> Public Gists
+                                <span class="badge badge-secondary">{{.ghaccount.NbrPublicGists}}</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <img src="/static/icons/octicons/person.svg" alt="">Followers
+                                <span class="badge badge-secondary">{{.ghaccount.NbrFollorwers}}</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <img src="/static/icons/octicons/person.svg" alt="">Following
+                                <span class="badge badge-secondary">{{.ghaccount.NbrFollowing}}</span>
+                            </li>
+                        </ul>
+                    </div>
+            </div>
+        </div>
+        </div>
+
+        <div class="col">
+            <h3>Projects</h3>
+        </div>
+
+    {{ range .Projects }}
+    <div class="card">
+        <div class="col-md-4" style="padding-top: 5px;">
+            <img src={{ .ThumbnailURL }} class="img-fluid" alt="">
+        </div>
+         <div class="row no-gutters">
+           <div class="col">
+                <div class="card-block px-2">
+                    <h4 class="card-title">{{ .Name }}</h4>
+                    <p class="card-text"> {{ .GitHub.Description }}</p>
+                    <div class="h5">Language</div>
+                    <hr>
+                    <div class="row">
+                        <div class="col">
+                        {{ range .Language }}
+                            <span class="badge badge-info">{{ . }}</span>
+                        {{ end }}
+                        </div>
+                    </div>
+                    <br>
+                    <div class="h5">Subjects</div>
+                    <hr>
+                    <div class="row">
+                        <div class="col">
+                        {{ range .Subjects}}
+                            <span class="badge badge-info">{{.}}</span>
+                        {{ end }}
+                        </div>
+                    </div>
+                    <br>
+                    <h5>GitHub</h5>
+                    <hr>
+                    <p>{{.GitHub.Name}}</p>
+
+                    <p>Created on {{.GitHub.CreatedOn}}</p>
+                    <p>Update at {{.GitHub.LastUpdateOn}}</p>
+
+                    <p>Star {{.GitHub.StarCount}}</p>
+                    <p>Fork {{.GitHub.ForksCount}}</p>
+                    <p>Commit {{.GitHub.CommitNumber}}</p>
+
+
+                    <div class="row" style="padding-bottom: 5px">
+                        <div class="col-sm-1">
+                        <a href={{.GitHub.URl}} class="btn btn-primary">GitHub</a>
+                        </div>
+                        {{ if ne .DocURL ""}}
+                        <div class="col-sm-1">
+                            <a href="{{.DocURL}}" class="btn btn-primary">Documentation</a>
+                            </div>
+                        {{ end }}
+                        {{ if ne .SiteURL ""}}
+                        <div class="col-sm-1">
+                            <a href="{{.SiteURL}}" class="btn btn-primary">Website</a>
+                            </div>
+                        {{ end }}
+                    </div>
+                </div>
+            </div>
+        </div>
+</div>
+{{ end }}
+</div>
+{{ end }}

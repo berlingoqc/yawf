@@ -2,6 +2,7 @@ package route
 
 import (
 	"errors"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"strings"
@@ -51,6 +52,17 @@ func (w *RoutePath) CreateBaseRouteContent(r *mux.Router, tmplfile string, tmpln
 		var data map[string]interface{}
 		if w.Handler != nil {
 			data = w.Handler(r)
+			// Regarde si il y a une erreur ou si on doit rediriger ailleur
+			if data != nil {
+				if _, ok := data["Error"]; ok {
+					data["Tmpl"] = tmplfile
+					tmplfile = "/shared/error.html"
+					tmplname = "error.html"
+				} else {
+					// Si la template request d'avoir info de l'usage courrant
+
+				}
+			}
 		}
 		slayout, _ = w.GetBaseTemplate(tmplfile, tmplname)
 		slayout.ExecuteTemplate(rw, "layout", data)
@@ -65,6 +77,12 @@ func GetRoutePath(tmplFile string, path string) *RoutePath {
 		Path:            path,
 	}
 	return b
+}
+
+func GetMarkdownRouteFile(fileName string, path string) *RoutePath {
+	return GetMarkdownRoutePath(path, func() ([]byte, error) {
+		return ioutil.ReadFile(fileName)
+	})
 }
 
 // GetMarkdownRoutePath retourne une route qui retour un fichier markdown

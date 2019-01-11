@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"database/sql"
 	"fmt"
 
 	"github.com/berlingoqc/yawf/db"
@@ -30,6 +31,33 @@ func (a *AccountError) Error() string {
 
 type AuthDB struct {
 	DB *db.BaseDB
+
+	FilePath string
+
+	tables []string
+}
+
+func (p *AuthDB) Initialize(filePath string) {
+	p.FilePath = filePath
+	p.DB = &db.BaseDB{}
+
+	p.tables = []string{authSqltable}
+}
+
+func (p *AuthDB) GetFilePath() string {
+	return p.FilePath
+}
+
+func (p *AuthDB) GetTables() []string {
+	return p.tables
+}
+
+func (p *AuthDB) GetDB() *sql.DB {
+	return p.DB.DB
+}
+
+func (p *AuthDB) SetDB(s *sql.DB) {
+	p.DB.DB = s
 }
 
 func (a *AuthDB) OpenDatabase(filePath string) error {

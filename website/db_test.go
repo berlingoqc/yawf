@@ -5,13 +5,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/berlingoqc/yawf/website/cv"
+	"github.com/berlingoqc/yawf/module/base"
+	"github.com/berlingoqc/yawf/module/blog"
 
 	"github.com/berlingoqc/yawf/db"
-	"github.com/berlingoqc/yawf/website/project"
+	"github.com/berlingoqc/yawf/module/project"
 )
 
-var dbName = "project.db"
+var dbName = "root/yawf.db"
 
 func Terror(t *testing.T, err error) {
 	if err != nil {
@@ -25,19 +26,27 @@ func TestProjectDB(t *testing.T) {
 		//err := os.Remove(dbName)
 		//Terror(t, err)
 	}()
+	basedb := &base.DB{}
+	basedb.Initialize(dbName)
+	err := db.OpenDatabase(basedb)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	pdb, e := GetProjectDBInstance(dbName)
+	pdb, e := project.GetProjectDBInstance(dbName)
 	Terror(t, e)
 	defer db.CloseDatabse(pdb)
 
-	lang := []string{"go", "jquery", "c++", "wasm", "glsl"}
+	bdb := blog.GetBlogDBInstance(dbName)
+
+	lang := []string{"go", "jquery", "c++", "wasm", "glsl", "shell", "cli", "bash"}
 	for _, l := range lang {
-		Terror(t, pdb.AddLanguage(l))
+		Terror(t, basedb.AddLanguage(l))
 	}
 
-	cat := []string{"website", "auth", "blog", "sql", "3d", "sound", "emscripten"}
+	cat := []string{"website", "auth", "blog", "sql", "3d", "sound", "emscripten", "linux", "archlinux", "wine"}
 	for _, c := range cat {
-		Terror(t, pdb.AddSubject(c))
+		Terror(t, basedb.AddSubject(c))
 	}
 
 	user_info := &project.GitHubAccount{
@@ -102,7 +111,7 @@ func TestProjectDB(t *testing.T) {
 	Terror(t, pdb.AddPProject(p, "yawf"))
 	Terror(t, pdb.AddPProject(p1, "YASE"))
 
-	formation := &cv.Formation{
+	formation := &base.Formation{
 		Name:        "Diplome d'etude secondaire en Art-Sport Etude",
 		NameDiploma: "DES Diplome d'etude secondaire",
 		School:      "Ecole Paul-Hubert",
@@ -113,7 +122,7 @@ func TestProjectDB(t *testing.T) {
 		Mention:     []string{"Sport and Art Program", ""},
 	}
 
-	formation_1 := &cv.Formation{
+	formation_1 := &base.Formation{
 		Name:        "Technique d'informatique industrielle",
 		NameDiploma: "DEC Diplome d'etude collegial",
 		School:      "Cegep Levis-Lauzon",
@@ -124,10 +133,10 @@ func TestProjectDB(t *testing.T) {
 		Mention:     []string{"D1 VolleyBall Team"},
 	}
 
-	Terror(t, pdb.AddFormation(formation))
-	Terror(t, pdb.AddFormation(formation_1))
+	Terror(t, basedb.AddFormation(formation))
+	Terror(t, basedb.AddFormation(formation_1))
 
-	experience := &cv.ProfessionalExperience{
+	experience := &base.ProfessionalExperience{
 		Job:         "Line Cook",
 		Corporation: "La Cage, Brasserie Sportive",
 		Location:    "Lévis and Boucherville",
@@ -136,9 +145,9 @@ func TestProjectDB(t *testing.T) {
 		Description: `Cook the meal with a focus on speed , quality and high accuracy`,
 	}
 
-	Terror(t, pdb.AddExperience(experience))
+	Terror(t, basedb.AddExperience(experience))
 
-	le_go := &cv.LanguageExperience{
+	le_go := &base.LanguageExperience{
 		Name:  "golang",
 		Level: "novice++",
 		Year:  2,
@@ -146,22 +155,22 @@ func TestProjectDB(t *testing.T) {
 		i love the simplicity and the tools that this language provide.
 		`,
 	}
-	le_cpp := &cv.LanguageExperience{
+	le_cpp := &base.LanguageExperience{
 		Name:        "c++",
 		Level:       "beginer++",
 		Year:        0,
 		Description: `Language use nat school most often, favorite for bigger, modular and cross-plateform library`,
 	}
-	le_jquery := &cv.LanguageExperience{
+	le_jquery := &base.LanguageExperience{
 		Name:        "jquery",
 		Level:       "toadler",
 		Year:        0,
 		Description: "Not very confident but i create this website to improve myself in front-end development so maybe in the near future",
 	}
 
-	Terror(t, pdb.AddLanguageExperience(le_go))
-	Terror(t, pdb.AddLanguageExperience(le_cpp))
-	Terror(t, pdb.AddLanguageExperience(le_jquery))
+	Terror(t, basedb.AddLanguageExperience(le_go))
+	Terror(t, basedb.AddLanguageExperience(le_cpp))
+	Terror(t, basedb.AddLanguageExperience(le_jquery))
 
 	languages, e := pdb.GetLanguage()
 	Terror(t, e)
@@ -186,44 +195,112 @@ func TestProjectDB(t *testing.T) {
 
 	}
 
-	fl, e := pdb.GetFormation()
+	fl, e := basedb.GetFormation()
 	Terror(t, e)
 	for _, i := range fl {
 		t.Logf("Formation : %v\n", i)
 	}
 
-	el, e := pdb.GetExperience()
+	el, e := basedb.GetExperience()
 	Terror(t, e)
 	for _, i := range el {
 		t.Logf("Experience : %v\n", i)
 	}
 
-	lel, e := pdb.GetLanguageExperience()
+	lel, e := basedb.GetLanguageExperience()
 	Terror(t, e)
 	for _, i := range lel {
 		t.Logf("Language Experience : %v\n", i)
 	}
 
-	// Get les nouvelles shits
-	ua, err := project.UpdateAccountInfo("berlingoqc")
-	if err != nil {
-		t.Fatalf("Error task github %v \n", err)
-		return
+	blog_p1 := &blog.Post{
+		Author:       "William Quintal",
+		Description:  "In this post i talk about my favorite application on Linux. From gamming to graphics to programming",
+		Subjects:     []string{"linux", "wine"},
+		Language:     []string{"bash"},
+		ThumbnailURL: "/static/blog/1/thumbnail.png",
+		PostOn:       time.Now().String(),
+		UpdateOn:     time.Now().String(),
+		Name:         "X Favorite App on Linux",
+		PostMarkdown: []byte(`
+		# Hello i love you
+
+		won't you tell me your name
+		
+		`),
 	}
-	err = pdb.UpdateGHAccount(ua)
+
+	blog_serie := &blog.Serie{
+		Title: "Arch Linux From noob to master",
+		Description: `Want to ditch that old windows and get in control of your computer ?
+		 You love to customize ? You are scared to jump in the world of linux ?
+		 
+		 Fear no more ! I'm here to teach you the way
+		 `,
+		ThumbnailURL: "/static/serie/1/thumbnail.png",
+	}
+
+	blog_p_s1 := &blog.Post{
+		Name:         "The journey from whatever to Linux",
+		Author:       "William Quintal",
+		Description:  "In this first post , i will explain the history of linux and the basic things to know",
+		Subjects:     []string{"linux"},
+		Language:     []string{"bash"},
+		ThumbnailURL: "/static/blog/2/thumbnail.png",
+		PostOn:       time.Now().String(),
+		UpdateOn:     time.Now().String(),
+		PostMarkdown: []byte(`
+			# The journey from whatever to Linux
+		`),
+	}
+
+	err = bdb.AddBlogPost(blog_p1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	repos, err := project.UpdateRepositoryInfo("berlingoqc", "YASE", "yawf")
+
+	err = bdb.AddBlogPost(blog_p_s1)
 	if err != nil {
-		t.Fatalf("Error task github %v \n", err)
+		t.Fatal(err)
 	}
-	// update dans la bd
-	for _, r := range repos {
-		err = pdb.UpdateGitHubRepo(r)
-		if err != nil {
-			t.Fatal(err)
-		}
+
+	err = bdb.AddBlogSerie(blog_serie)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Get la liste de serie pour avoir l'id
+	sl, err := bdb.GetSerieList(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sl) != 1 {
+		t.Fatal("Length of serie list should be one")
+	}
+	idBs := sl[0].ID
+	// get la liste des blog pour avoir l'id
+	pl, err := bdb.GetBlogDescriptionList()
+	if err != nil {
+		t.Fatal(err)
+	}
+	idBp := pl[1].ID
+
+	err = bdb.AddBlogToSerie(idBs, idBp)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// le content du blog post
+	pc, err := bdb.GetBlogContent(idBp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(pc)
+
+	// get serie recursive
+	sl, err = bdb.GetSerieList(true)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 }
