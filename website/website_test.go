@@ -17,7 +17,7 @@ import (
 var (
 	goPath         = "/home/wq/go"
 	directoryAsset = ""
-	wantedModule   = make([]config.IModule, 4)
+	wantedModule   = make([]config.IModule, 5)
 )
 
 func init() {
@@ -97,7 +97,6 @@ func TestInitializeWebSite(t *testing.T) {
 		Owner: config.OwnerInformation{
 			About:        true,
 			FAQ:          true,
-			PersonalPage: true,
 			ContactPage:  true,
 			Birth:        "1995/07/05",
 			FullName:     "William Quintal",
@@ -151,11 +150,11 @@ func TestInitializeWebSite(t *testing.T) {
 
 func TestWebSiteDefault(t *testing.T) {
 	// Valide que le nombre de module disponible est egale a 4
-	if len(DefaultModule) != 4 {
-		t.Fatal("There should be 4 default module")
+	if len(DefaultModule) != 5 {
+		t.Fatal("There should be 5 default module")
 	}
 
-	wantedModule := make([]config.IModule, 4)
+	wantedModule := make([]config.IModule, 5)
 	i := 0
 	for _, v := range DefaultModule {
 		wantedModule[i] = v

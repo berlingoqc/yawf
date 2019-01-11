@@ -7,6 +7,7 @@ import (
 
 	"github.com/berlingoqc/yawf/module/base"
 	"github.com/berlingoqc/yawf/module/blog"
+	"github.com/berlingoqc/yawf/module/personal"
 
 	"github.com/berlingoqc/yawf/db"
 	"github.com/berlingoqc/yawf/module/project"
@@ -32,12 +33,20 @@ func TestProjectDB(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	perdb := &personal.DB{}
+	perdb.Initialize(dbName)
+	err = db.OpenDatabase(perdb)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	pdb, e := project.GetProjectDBInstance(dbName)
 	Terror(t, e)
 	defer db.CloseDatabse(pdb)
 
 	bdb := blog.GetBlogDBInstance(dbName)
+
+	defer db.CloseDatabse(bdb)
 
 	lang := []string{"go", "jquery", "c++", "wasm", "glsl", "shell", "cli", "bash"}
 	for _, l := range lang {
@@ -111,7 +120,7 @@ func TestProjectDB(t *testing.T) {
 	Terror(t, pdb.AddPProject(p, "yawf"))
 	Terror(t, pdb.AddPProject(p1, "YASE"))
 
-	formation := &base.Formation{
+	formation := &personal.Formation{
 		Name:        "Diplome d'etude secondaire en Art-Sport Etude",
 		NameDiploma: "DES Diplome d'etude secondaire",
 		School:      "Ecole Paul-Hubert",
@@ -122,7 +131,7 @@ func TestProjectDB(t *testing.T) {
 		Mention:     []string{"Sport and Art Program", ""},
 	}
 
-	formation_1 := &base.Formation{
+	formation_1 := &personal.Formation{
 		Name:        "Technique d'informatique industrielle",
 		NameDiploma: "DEC Diplome d'etude collegial",
 		School:      "Cegep Levis-Lauzon",
@@ -133,10 +142,10 @@ func TestProjectDB(t *testing.T) {
 		Mention:     []string{"D1 VolleyBall Team"},
 	}
 
-	Terror(t, basedb.AddFormation(formation))
-	Terror(t, basedb.AddFormation(formation_1))
+	Terror(t, perdb.AddFormation(formation))
+	Terror(t, perdb.AddFormation(formation_1))
 
-	experience := &base.ProfessionalExperience{
+	experience := &personal.ProfessionalExperience{
 		Job:         "Line Cook",
 		Corporation: "La Cage, Brasserie Sportive",
 		Location:    "Lévis and Boucherville",
@@ -145,9 +154,9 @@ func TestProjectDB(t *testing.T) {
 		Description: `Cook the meal with a focus on speed , quality and high accuracy`,
 	}
 
-	Terror(t, basedb.AddExperience(experience))
+	Terror(t, perdb.AddExperience(experience))
 
-	le_go := &base.LanguageExperience{
+	le_go := &personal.LanguageExperience{
 		Name:  "golang",
 		Level: "novice++",
 		Year:  2,
@@ -155,22 +164,22 @@ func TestProjectDB(t *testing.T) {
 		i love the simplicity and the tools that this language provide.
 		`,
 	}
-	le_cpp := &base.LanguageExperience{
+	le_cpp := &personal.LanguageExperience{
 		Name:        "c++",
 		Level:       "beginer++",
 		Year:        0,
 		Description: `Language use nat school most often, favorite for bigger, modular and cross-plateform library`,
 	}
-	le_jquery := &base.LanguageExperience{
+	le_jquery := &personal.LanguageExperience{
 		Name:        "jquery",
 		Level:       "toadler",
 		Year:        0,
 		Description: "Not very confident but i create this website to improve myself in front-end development so maybe in the near future",
 	}
 
-	Terror(t, basedb.AddLanguageExperience(le_go))
-	Terror(t, basedb.AddLanguageExperience(le_cpp))
-	Terror(t, basedb.AddLanguageExperience(le_jquery))
+	Terror(t, perdb.AddLanguageExperience(le_go))
+	Terror(t, perdb.AddLanguageExperience(le_cpp))
+	Terror(t, perdb.AddLanguageExperience(le_jquery))
 
 	languages, e := pdb.GetLanguage()
 	Terror(t, e)
@@ -195,19 +204,19 @@ func TestProjectDB(t *testing.T) {
 
 	}
 
-	fl, e := basedb.GetFormation()
+	fl, e := perdb.GetFormation()
 	Terror(t, e)
 	for _, i := range fl {
 		t.Logf("Formation : %v\n", i)
 	}
 
-	el, e := basedb.GetExperience()
+	el, e := perdb.GetExperience()
 	Terror(t, e)
 	for _, i := range el {
 		t.Logf("Experience : %v\n", i)
 	}
 
-	lel, e := basedb.GetLanguageExperience()
+	lel, e := perdb.GetLanguageExperience()
 	Terror(t, e)
 	for _, i := range lel {
 		t.Logf("Language Experience : %v\n", i)

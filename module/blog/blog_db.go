@@ -159,12 +159,12 @@ func (p *DB) GetSerieList(loadPostDescription bool) ([]*Serie, error) {
 				return nil, err
 			}
 			for rows.Next() {
-				p, err := parseRowBlogDescription(rows)
+				pd, err := parseRowBlogDescription(rows)
 				if err != nil {
 					rows.Close()
 					return nil, err
 				}
-				s.Posts = append(s.Posts, p)
+				s.Posts = append(s.Posts, pd)
 			}
 			rows.Close()
 			err = p.LoadLanguageSubjectPosts(s.Posts)

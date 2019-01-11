@@ -1,6 +1,7 @@
 package blog
 
 import (
+	"io/ioutil"
 	"net/http"
 	"strconv"
 
@@ -69,23 +70,42 @@ func (b *BlogModule) AddToWebServer(ws config.IWebServer) error {
 		&route.RoutePath{ContentTmplPath: "/blog/post.html", Path: "/post"},
 	)
 
-	wp.Route["/"].Handler = func(r *http.Request) map[string]interface{} {
-		m := make(map[string]interface{})
+	nb := ws.GetNavigationBar()
+
+	dl := route.DropLink{
+		Title: "Blog",
+		Links: make([][]route.Link, 1),
+	}
+	dl.Links[0] = make([]route.Link, 3)
+
+	dl.Links[0][0] = route.Link{
+		Name: "All", URL: "/blog/",
+	}
+	dl.Links[0][1] = route.Link{
+		Name: "Series", URL: "/blog/serie",
+	}
+
+	dl.Links[0][2] = route.Link{
+		Name: "Post", URL: "/blog/post",
+	}
+
+	nb.Items = append(nb.Items, dl)
+
+	wp.Route["/"].Handler = func(m map[string]interface{}, r *http.Request) {
 		var err error
 		idb := b.getDB()
 		defer db.CloseDatabse(idb)
 		m["Series"], err = idb.GetSerieList(true)
 		if err != nil {
-			//return nil
+			m["Error"] = err
+			return
 		}
 		m["posts"], err = idb.GetBlogDescriptionList()
 		if err != nil {
-			return nil
+			m["Error"] = err
 		}
-		return m
 	}
-	wp.Route["/post"].Handler = func(r *http.Request) map[string]interface{} {
-		m := make(map[string]interface{})
+	wp.Route["/post"].Handler = func(m map[string]interface{}, r *http.Request) {
 		idb := b.getDB()
 		defer db.CloseDatabse(idb)
 
@@ -94,29 +114,55 @@ func (b *BlogModule) AddToWebServer(ws config.IWebServer) error {
 		idPost, ok := r.URL.Query()["id"]
 		if !ok || len(idPost) == 0 {
 			m["Posts"], _ = idb.GetBlogDescriptionList()
-			return m
+			return
 		}
 		id, err := strconv.Atoi(idPost[0])
 		if err != nil {
 			m["Error"] = err
-			return m
+			return
 		}
 
 		post, err := idb.GetBlogContent(id)
 		if err != nil {
 			m["Error"] = err
-			return m
+			return
 		}
 		m["Post"] = post
 		// Convertie le content byte markdown vers string(html)
-		m["Content"] = string(blackfriday.Run(post.PostMarkdown))
-		return m
+		data, _ := ioutil.ReadFile("/home/wq/test.md")
+		m["md"] = string(blackfriday.Run(data))
+		return
 	}
 
-	wp.Route["/serie"].Handler = func(r *http.Request) map[string]interface{} {
-		m := make(map[string]interface{})
-		return m
+	wp.Route["/serie"].Handler = func(m map[string]interface{}, r *http.Request) {
 	}
+
+	// Ajoutes mes routs d'api
+	apiBlog := ws.GetMux().PathPrefix("/api/blog").Subrouter()
+
+	apiBlog.Path("/post").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// get seulement le content depuis la bd
+		n, ok := r.URL.Query()["id"]
+		if !ok || len(n) != 1 {
+			w.Write([]byte("Error"))
+			return
+		}
+		id, err := strconv.Atoi(n[0])
+		if err != nil {
+			w.Write([]byte(err.Error()))
+			return
+		}
+		idb := b.getDB()
+		defer db.CloseDatabse(idb)
+		post, err := idb.GetBlogContent(id)
+		if err != nil {
+			w.Write([]byte(err.Error()))
+			return
+		}
+		// Convertie le content byte markdown vers string(html)
+		data := blackfriday.Run(post.PostMarkdown)
+		w.Write(data)
+	})
 
 	ws.AddRoute(wp)
 

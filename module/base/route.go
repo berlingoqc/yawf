@@ -1,7 +1,7 @@
 package base
 
 import (
-	"log"
+	"errors"
 	"net/http"
 
 	"github.com/berlingoqc/yawf/config"
@@ -30,18 +30,17 @@ type Module struct {
 
 func (b *Module) Initialize(data map[string]interface{}) error {
 	// Recoit les informations sur la personne dans la map
-	/*if d, ok := data[config.KeyOwnerInformation]; ok {
-		b.ownerInfo = d.(*config.OwnerInformation)
-	} else {
-		return errors.New("Missing key " + config.KeyOwnerInformation)
-	}
 	if d, ok := data[config.KeyRootFolder]; ok {
 		b.root = d.(string)
 	} else {
 		return errors.New("Missing key " + config.KeyRootFolder)
 	}
-	*/
+
 	b.ownerInfo = &config.OwnerInformation{}
+	err := config.MapToStruct(data, b.ownerInfo)
+	if err != nil {
+		return err
+	}
 	b.getDb = func() *DB {
 		idb, err := b.GetDBInstanceFactory(b.root + "/" + config.DBName)()
 		if err != nil {
@@ -70,58 +69,63 @@ func (b *Module) GetDBInstanceFactory(filepath string) func() (db.IDB, error) {
 
 func (b *Module) GetNeededAssets() []string {
 	return []string{
-		"/template/index.html", "/template/denied.html", "/template/error.html", "/template/me.html",
-		"/template/cv.html", "/template/shared/layout.html", "/template/shared/footer.html",
-		"/static/css/setupwizard.css", "/static/css/style_global.css",
+		"/template/index.html", "/template/denied.html", "/template/error.html",
+		"/template/shared/layout.html", "/template/shared/footer.html",
+		"/static/css/setupwizard.css", "/static/css/style_global.css", "/template/shared/markdown_page.html",
 	}
 }
 
 func (b *Module) AddToWebServer(ws config.IWebServer) error {
-	var err error
 	wPath := route.GetWPath("base", ws.GetMux(),
 		&route.RoutePath{ContentTmplPath: "/index.html", Path: "/"},
 		&route.RoutePath{ContentTmplPath: "/denied.html", Path: "/denied"},
 		&route.RoutePath{ContentTmplPath: "/error.html", Path: "/error"},
-		&route.RoutePath{ContentTmplPath: "/me.html", Path: "/me"},
-
-		&route.RoutePath{ContentTmplPath: "/cv.html", Path: "/cv"},
 	)
 
-	if b.ownerInfo.ContactPage {
-		wPath.Route["/contact"] = route.GetMarkdownRouteFile(b.root+"/markdown/contact.md", "/contact")
+	nb := ws.GetNavigationBar()
+
+	dl := route.DropLink{
+		Title: "Basic",
+		Links: make([][]route.Link, 1),
+	}
+	dl.Links[0] = make([]route.Link, 3)
+
+	dl.Links[0][0] = route.Link{
+		Name: "Contact", URL: "/contact",
+	}
+	dl.Links[0][1] = route.Link{
+		Name: "FAQ", URL: "/faq",
 	}
 
-	if b.ownerInfo.PersonalPage {
-		wPath.Route["/personal"] = route.GetMarkdownRouteFile(b.root+"/markdown/personal.md", "/personal")
+	dl.Links[0][2] = route.Link{
+		Name: "About", URL: "/about",
+	}
+
+	nb.Items = append(nb.Items, dl)
+
+	if b.ownerInfo.ContactPage {
+		wPath.Route["/contact"] = &route.RoutePath{ContentTmplPath: "/shared/markdown_page.html", Path: "/contact"}
+		wPath.Route["/contact"].Handler = func(m map[string]interface{}, r *http.Request) {
+			m["File"] = "contact.md"
+		}
 	}
 
 	if b.ownerInfo.FAQ {
-		wPath.Route["/faq"] = route.GetMarkdownRouteFile(b.root+"/markdown/faq.md", "/faq")
+		wPath.Route["/faq"] = &route.RoutePath{ContentTmplPath: "/shared/markdown_page.html", Path: "/faq"}
+		wPath.Route["/faq"].Handler = func(m map[string]interface{}, r *http.Request) {
+			m["File"] = "faq.md"
+		}
 	}
 
 	if b.ownerInfo.About {
-		wPath.Route["/about"] = route.GetMarkdownRouteFile(b.root+"/markdown/about.md", "/about")
+		wPath.Route["/about"] = &route.RoutePath{ContentTmplPath: "/shared/markdown_page.html", Path: "/about"}
+		wPath.Route["/about"].Handler = func(m map[string]interface{}, r *http.Request) {
+			m["File"] = "about.md"
+		}
 	}
 
-	wPath.Route["/cv"].Handler = func(r *http.Request) map[string]interface{} {
-		idb := b.getDb()
-		defer db.CloseDatabse(idb)
-
-		m := make(map[string]interface{})
-		m["experiences"], err = idb.GetExperience()
-		if err != nil {
-			log.Println(err)
-		}
-		m["formations"], err = idb.GetFormation()
-		if err != nil {
-			log.Println(err)
-		}
-		m["languages"], err = idb.GetLanguageExperience()
-		if err != nil {
-			log.Println(err)
-		}
-		return m
-	}
+	pathMd := ws.GetMux().Path("/md")
+	route.AddMarkdownFolderHandler(pathMd, b.root+"/markdown")
 
 	ws.AddRoute(wPath)
 

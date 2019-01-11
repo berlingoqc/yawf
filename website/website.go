@@ -3,6 +3,7 @@ package website
 
 import (
 	"context"
+	"html/template"
 	"log"
 	"net/http"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/berlingoqc/yawf/module/base"
+	"github.com/berlingoqc/yawf/module/personal"
 
 	"github.com/berlingoqc/yawf/config"
 	"github.com/berlingoqc/yawf/module/blog"
@@ -41,14 +43,17 @@ func init() {
 	DefaultModule[s] = m
 	s, m = user.GetModule()
 	DefaultModule[s] = m
+	s, m = personal.GetModule()
+	DefaultModule[s] = m
 }
 
 // WebServer base de mon web server avec mux , run async et peux
 // etre canceller avec un channel
 type WebServer struct {
-	Logger *log.Logger
-	Mux    *mux.Router
-	Hs     *http.Server
+	Logger        *log.Logger
+	Mux           *mux.Router
+	Hs            *http.Server
+	NavigationBar *route.NavigationBar
 
 	TaskPool config.TaskPool
 
@@ -58,6 +63,10 @@ type WebServer struct {
 	StaticRoot string
 
 	MainRoutes map[string]*route.WPath
+}
+
+func (w *WebServer) GetNavigationBar() *route.NavigationBar {
+	return w.NavigationBar
 }
 
 func (w *WebServer) GetTaskPool() *config.TaskPool {
@@ -79,6 +88,8 @@ func (w *WebServer) AddRoute(r *route.WPath) {
 // Setup configure le serveur web doit être appeler avec le reste
 func (w *WebServer) Setup(assetPath *config.WebSite) error {
 
+	w.NavigationBar = route.GetNavigationBar("WQ")
+
 	w.TaskPool.Tasks = make(map[string]config.ITask)
 
 	w.MainRoutes = make(map[string]*route.WPath)
@@ -90,6 +101,19 @@ func (w *WebServer) Setup(assetPath *config.WebSite) error {
 
 	r := mux.NewRouter()
 	w.Mux = r
+
+	// Update le default handler de route pour qu'il ajoute dans la map la navbar
+	route.GetHandlerMap = func() map[string]interface{} {
+		m := make(map[string]interface{})
+		m["Navbar"] = w.NavigationBar
+		mf := template.FuncMap{}
+
+		route.AddNavBarTmplFunc(mf)
+
+		m["Func"] = mf
+		return m
+
+	}
 
 	// Creation de mon handler pour servir les fichiers statiques
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir(w.StaticRoot))))

@@ -66,6 +66,13 @@ func (b *Module) AddToWebServer(ws config.IWebServer) error {
 		&route.RoutePath{ContentTmplPath: "/login/new.html", Path: "/new"},
 		&route.RoutePath{ContentTmplPath: "/login/confirm.html", Path: "/confirm"},
 	)
+	// Ajoute notre info a la navbar
+	nb := ws.GetNavigationBar()
+	nb.Buttons = append(nb.Buttons, route.Button{
+		Name:  "Account",
+		Style: "btn-success",
+		URL:   "/auth/login",
+	})
 
 	wPath.AddMiddleware(api.MiddlewareAuth)
 

@@ -45,6 +45,8 @@ type IWebServer interface {
 	GetLogger() *log.Logger
 	GetMux() *mux.Router
 
+	GetNavigationBar() *route.NavigationBar
+
 	AddRoute(r *route.WPath)
 }
 
@@ -58,15 +60,14 @@ type ModuleInfo struct {
 // OwnerInformation contient les informations a afficher de base
 // sur le owner du site
 type OwnerInformation struct {
-	FullName     string
+	FullName     string `map:"required"`
 	Birth        string
 	Location     string
 	ThumbnailURL string
 
-	ContactPage  bool
-	PersonalPage bool
-	About        bool
-	FAQ          bool
+	ContactPage bool
+	About       bool
+	FAQ         bool
 }
 
 type WebSite struct {
@@ -130,7 +131,8 @@ func GetWebServer(opt map[string]interface{}) *http.Server {
 
 func GetMapFromConfig(w *WebSite) map[string]interface{} {
 	m := make(map[string]interface{})
-	m[KeyOwnerInformation] = w.Owner
+	s, m1, _ := StructToMap(&w.Owner)
+	m[s] = m1
 	m[KeyRootFolder] = w.RootFolder
 	m[KeyNetOption] = w.NetOptions
 	m[KeyUserOption] = w.AppUsers
