@@ -97,6 +97,14 @@ type Widget struct {
 	Render func(interface{}, http.ResponseWriter, *http.Request) interface{}
 }
 
+func ReadFileString(filepath string) (string, error) {
+	data, err := ioutil.ReadFile(filepath)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
 // ModuleWidgetAPI create a api to serve widget use by a module and provide to the others
 func ModuleWidgetAPI(r *mux.Route, root string, widgets map[string]Widget) {
 	r.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -125,15 +133,22 @@ func ModuleWidgetAPI(r *mux.Route, root string, widgets map[string]Widget) {
 		if data == nil {
 			return
 		}
-		tmpl := template.New("")
-		tmpl, err := tmpl.ParseFiles(root + "/template" + widget.File)
-		tmpl = tmpl.Lookup(widget.File)
+		tmpleData, err := ReadFileString(root + "/template" + widget.File)
+		if err != nil {
+			RespondWithError(w, http.StatusBadRequest, err.Error())
+		}
+		tmpl, err := template.New("widget").Parse(tmpleData)
 		if err != nil {
 			// Respond with error widget
 			RespondWithError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		tmpl.Execute(w, data)
+		err = tmpl.Execute(w, data)
+		if err != nil {
+			RespondWithError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		w.Header().Add("Content-Type", "text/plain")
 	})
 }
 
@@ -235,6 +250,14 @@ func GetMarkdownRouteFile(fileName string, path string) *RoutePath {
 	return GetMarkdownRoutePath(path, func() ([]byte, error) {
 		return ioutil.ReadFile(fileName)
 	})
+}
+
+func GetMarkdownPage(path string, name string) *RoutePath {
+	r := &RoutePath{ContentTmplPath: "/shared/markdown_page.html", Path: path}
+	r.Handler = func(m map[string]interface{}, r *http.Request) {
+		m["File"] = name
+	}
+	return r
 }
 
 // GetMarkdownRoutePath retourne une route qui retour un fichier markdown

@@ -1,153 +1,212 @@
 package config
 
 import (
-	"encoding/json"
 	"errors"
-	"io/ioutil"
-	"log"
+	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/berlingoqc/yawf/db"
-	"github.com/berlingoqc/yawf/website/route"
-	"github.com/gorilla/mux"
+	"github.com/berlingoqc/yawf/conv"
+
+	"github.com/berlingoqc/yawf/utility"
 )
 
-const (
-	KeyOwnerInformation = "OwnerInformation"
-	KeyRootFolder       = "key_root_folder"
-	KeyNetOption        = "key_net"
-	KeyUserOption       = "key_user"
+// Ctx represent the context that is pass across the application
+// to configure correctly the different part with the informations
+// that should be provides to them
+type Ctx map[string]interface{}
 
-	KeyPort = "key_net_port"
-	KeyAddr = "key_net_addr"
+// GetWebServer try to find is the webConfig struct is present
+// in the context
+func GetWebServer(c Ctx) (*http.Server, error) {
+	no := &NetworkOptions{}
+	err := conv.FindStructMap(c, no)
+	if err != nil {
+		return nil, err
+	}
+	ws := &http.Server{
+		Addr:         fmt.Sprintf("%v:%v", no.Addr, no.Port),
+		WriteTimeout: time.Duration(no.TimeoutLength) * time.Second,
+		ReadTimeout:  time.Duration(no.TimeoutLength) * time.Second,
+	}
 
-	ConfigFileName = "yawf.conf"
-	DBName         = "yawf.db"
-)
-
-type IModule interface {
-	Initialize(data map[string]interface{}) error
-	GetInfo() ModuleInfo
-	GetDBInstanceFactory(filepath string) func() (db.IDB, error)
-
-	AddToWebServer(ws IWebServer) error
-	GetNeededAssets() []string
-	GetPackageName() string
+	return ws, nil
 }
 
-var (
-	AvailableModule = make(map[string]IModule)
-)
-
-type IWebServer interface {
-	GetTaskPool() *TaskPool
-	GetLogger() *log.Logger
-	GetMux() *mux.Router
-
-	GetNavigationBar() *route.NavigationBar
-
-	AddRoute(r *route.WPath)
+// GetOwnerInformation try to find if the OwnerInformations is in the map
+func GetOwnerInformation(c Ctx) (*OwnerInformation, error) {
+	t := &OwnerInformation{}
+	return t, conv.FindStructMap(c, t)
 }
 
-// ModuleInfo contient l'informations sur les modules
-// disponible dans le framework
-type ModuleInfo struct {
-	Name        string
-	Description string
+// GetFileConfig try to find if the FileConfig is in the map ( should always be )
+func GetFileConfig(c Ctx) (*FileConfig, error) {
+	f := &FileConfig{}
+	return f, conv.FindStructMap(c, f)
+}
+
+// GetBaseConfig try to find the BaseConfig
+func GetBaseConfig(c Ctx) (*BaseConfig, error) {
+	b := &BaseConfig{}
+	return b, conv.FindStructMap(c, b)
+}
+
+// GetEnableModule try to find the map of informations to provides to the
+// modules enabled
+func GetEnableModule(c Ctx) (map[string]map[string]interface{}, error) {
+	if d, ok := c["EnableModule"]; ok {
+		return d.(map[string]map[string]interface{}), nil
+	}
+
+	return nil, &conv.KeyError{
+		Name:   "EnableModule",
+		Status: conv.NotFound,
+	}
 }
 
 // OwnerInformation contient les informations a afficher de base
 // sur le owner du site
 type OwnerInformation struct {
-	FullName     string `map:"required"`
-	Birth        string
-	Location     string
+	// FullName of the owner of the website
+	FullName string `map:"required"`
+	// Birth is the day of birth of the owner
+	Birth string
+	// Location is the approximal location of the owner like (state, country or town)
+	Location string
+	// ThumbnailURL is a link to the user thumbnail for the home page
 	ThumbnailURL string
-
-	ContactPage bool
-	About       bool
-	FAQ         bool
 }
 
-type WebSite struct {
-	// RootFolder where all the files are store
-	RootFolder string
+// NetworkOptions are the configuration for the http.Server networking configuration
+type NetworkOptions struct {
+	Addr          string
+	Port          int
+	TimeoutLength int
+}
 
+// FileConfig contains the information about the location
+// of the different composant of the website
+type FileConfig struct {
+	RootFolder   string
+	DBFile       string
+	AssetFolder  string
+	StaticFolder string
+	ConfigFile   string
+}
+
+// GetConfigPath return the full path of the configuration file
+func (f *FileConfig) GetConfigPath() string {
+	return f.RootFolder + "/" + f.ConfigFile
+}
+
+// GetRootFolder retourne the root folder where the files are stored
+func (f *FileConfig) GetRootFolder() string {
+	return f.RootFolder
+}
+
+// GetDBFilePath return the full path of the database file
+func (f *FileConfig) GetDBFilePath() string {
+	return f.RootFolder + "/" + f.DBFile
+}
+
+// GetAssetFolderPath return the full path of the asset folder
+func (f *FileConfig) GetAssetFolderPath() string {
+	return f.RootFolder + "/" + f.AssetFolder
+}
+
+// GetStaticFolderPath return the fulll path of the static folder
+func (f *FileConfig) GetStaticFolderPath() string {
+	return f.GetAssetFolderPath() + "/" + f.StaticFolder
+}
+
+// BaseConfig represent the configuration of the base module
+type BaseConfig struct {
+	Contact bool
+	About   bool
+	FAQ     bool
+}
+
+// WebSite is the struct that hold all the information that is provides by the main configuration file
+type WebSite struct {
+	// File is the struct that contains the informations where the config
+	// files are located
+	File *FileConfig
 	// Name is the website
 	Name string
 
 	// Owner contains informations about the owner of the website
-	Owner OwnerInformation
+	Owner *OwnerInformation
 
 	// NetOptions contains all the networking information about the webserver
-	NetOptions map[string]interface{}
+	NetOptions *NetworkOptions
 
 	// AppUsers contains informations about the connection informations
 	// for all the service of the website like github or linked
 	AppUsers map[string]interface{}
 
 	// EnableModule contains the module enable key = name and ther options
-	EnableModule map[string]map[string]interface{}
+	EnableModule map[string]interface{}
 }
 
-func Save(root string, w *WebSite) error {
-	b, err := json.Marshal(w)
-	if err != nil {
-		return err
-	}
-	return ioutil.WriteFile(root+"/"+ConfigFileName, b, 0640)
+// ToContext convert the struct to a my context map
+func (w *WebSite) ToContext() Ctx {
+	m := make(map[string]interface{})
+	conv.AddStructToMap(m, w.File)
+	conv.AddStructToMap(m, w.Owner)
+	conv.AddStructToMap(m, w.NetOptions)
+	m["Name"] = w.Name
+	m["AppUsers"] = w.AppUsers
+	m["EnableModule"] = w.EnableModule
+	return m
 }
 
-func Load(root string) (*WebSite, error) {
-	b, err := ioutil.ReadFile(root + "/" + ConfigFileName)
-	if err != nil {
-		return nil, err
-	}
-	ws := &WebSite{}
-	return ws, json.Unmarshal(b, ws)
-}
-
-func ValidFolder() error {
+// Validate ensure that all required struct are well configurate and that the root folder exists
+func (w *WebSite) Validate() error {
 
 	return nil
 }
 
-func GetWebServer(opt map[string]interface{}) *http.Server {
-	ws := &http.Server{
-		WriteTimeout: 15 * time.Second,
-		ReadTimeout:  15 * time.Second,
-		Addr:         ":8081",
-	}
-	if d, ok := opt[KeyAddr]; ok {
-		ws.Addr = d.(string)
-	}
-	if d, ok := opt[KeyPort]; ok {
-		ws.Addr = ":" + d.(string)
-	}
-
-	return ws
+// Save the configuration file to path inside File
+func (w *WebSite) Save() error {
+	ctx := w.ToContext()
+	return conv.Save(w.File.GetConfigPath(), ctx)
 }
 
-func GetMapFromConfig(w *WebSite) map[string]interface{} {
-	m := make(map[string]interface{})
-	s, m1, _ := StructToMap(&w.Owner)
-	m[s] = m1
-	m[KeyRootFolder] = w.RootFolder
-	m[KeyNetOption] = w.NetOptions
-	m[KeyUserOption] = w.AppUsers
-	return m
-}
-
-func GetDBFullPath(m map[string]interface{}) (string, error) {
-	if d, ok := m[KeyRootFolder]; ok {
-		return d.(string) + "/" + DBName, nil
+// LoadWebSiteConfig load the configuration of the website
+func LoadWebSiteConfig(filePath string) (*WebSite, error) {
+	m, err := conv.Load(filePath)
+	if err != nil {
+		return nil, err
 	}
-	return "", errors.New("Key dont exists for RootFolder")
-}
 
-func GetDBFullPathRoot(root string) string {
-	return root + "/" + DBName
+	ws := &WebSite{
+		Owner:      &OwnerInformation{},
+		NetOptions: &NetworkOptions{},
+		File:       &FileConfig{},
+	}
+	if n, ok := m["Name"]; ok {
+		ws.Name = n.(string)
+	} else {
+		return nil, errors.New("No name")
+	}
+
+	err = conv.FindStructMap(m, ws.Owner)
+	if err != nil {
+		return nil, err
+	}
+	err = conv.FindStructMap(m, ws.File)
+	if err != nil {
+		return nil, err
+	}
+	err = conv.FindStructMap(m, ws.NetOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	ws.AppUsers = m["AppUsers"].(map[string]interface{})
+	ws.EnableModule = m["EnableModule"].(map[string]interface{})
+
+	return ws, nil
 }
 
 // ImportModuleAsset import the assets of all module to the rootPath
@@ -156,7 +215,7 @@ func ImportModuleAsset(gopath string, rootPath string, wantedModules []IModule) 
 	gopath += "/src"
 
 	for _, m := range wantedModules {
-		goPath := gopath + "/" + m.GetPackageName()
+		goPath := gopath + "/" + m.GetInfo().Package
 
 		files := m.GetNeededAssets()
 		for _, f := range files {
@@ -164,7 +223,7 @@ func ImportModuleAsset(gopath string, rootPath string, wantedModules []IModule) 
 			dest := assetPath + f
 			f = goPath + "/asset" + f
 			// Copy vers le asset path
-			err := Copy(f, dest)
+			err := utility.Copy(f, dest)
 			if err != nil {
 				return err
 			}

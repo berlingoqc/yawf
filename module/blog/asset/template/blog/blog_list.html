@@ -1,0 +1,10 @@
+<div id="blogList">
+    <div class="list-group">
+        {{ range .Posts }}
+            <a class="list-group-item list-group-item-action" href={{print "/blog/post?id=" .ID}}>
+                {{.Name}}
+            </a>
+        {{ end }}
+    </div>>
+</div>
+

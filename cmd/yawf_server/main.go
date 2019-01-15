@@ -11,12 +11,12 @@ func main() {
 
 	var dir string
 
-	flag.StringVar(&dir, "web_asset", ".", "the directory to serve file from. Default current working directory")
+	flag.StringVar(&dir, "config_file", "", "the directory to serve file from. Default current working directory")
 	flag.Parse()
 
-	if dir == "." {
-		//dir, _ = os.Getwd()
-		dir = "/home/wq/go/src/github.com/berlingoqc/yawf/website/root"
+	if dir == "" {
+		fmt.Println("Enter the configuration file with --config_file")
+		return
 	}
 
 	fmt.Printf("Web asset %v \n", dir)

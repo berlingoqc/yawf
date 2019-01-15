@@ -14,22 +14,30 @@ type Signal interface {
 type PeriodicTask struct {
 	Name      string
 	Frequency time.Duration
-	Task      func(chan *Signal, ...interface{})
+	Task      func(chan *Signal, map[string]interface{})
 
 	enable bool
 	signal chan *Signal
 	ticker *time.Ticker
 }
 
+// GetName ...
+func (p *PeriodicTask) GetName() string {
+	return p.Name
+}
+
+// IsEnabled tell if this task is enable
 func (p *PeriodicTask) IsEnabled() bool {
 	return p.enable
 }
 
-func (p *PeriodicTask) Enable(args ...interface{}) {
+// Enable start to schedule the task
+func (p *PeriodicTask) Enable(args map[string]interface{}) {
 	p.reset()
 	p.enable = true
 }
 
+// Disable stop the current task
 func (p *PeriodicTask) Disable() {
 	p.enable = false
 	close(p.signal)
@@ -37,6 +45,7 @@ func (p *PeriodicTask) Disable() {
 	p.ticker = nil
 }
 
+// ReadyToLaunch tell if this task need to be execute right now
 func (p *PeriodicTask) ReadyToLaunch() bool {
 	select {
 	case <-p.ticker.C:
@@ -46,13 +55,15 @@ func (p *PeriodicTask) ReadyToLaunch() bool {
 	}
 }
 
+// Launch start the task one time
 func (p *PeriodicTask) Launch() {
-	go p.Task(p.signal)
+	go p.Task(p.signal, nil)
 }
 
+// LaunchIfReady start the task if it is ready to start
 func (p *PeriodicTask) LaunchIfReady() {
 	if p.ReadyToLaunch() {
-		go p.Task(p.signal)
+		go p.Task(p.signal, nil)
 	}
 
 }

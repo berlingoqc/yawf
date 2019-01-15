@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/berlingoqc/yawf/config"
+	"github.com/gorilla/mux"
 
 	"github.com/berlingoqc/yawf/db"
 	"github.com/russross/blackfriday/v2"
@@ -14,63 +15,52 @@ import (
 )
 
 var (
+	// ModuleInfo ...
 	ModuleInfo config.ModuleInfo = config.ModuleInfo{
 		Name:        "blog",
+		Package:     "github.com/berlingoqc/yawf/module/blog",
 		Description: "With this module you can add a simple bloging engine to your website. The post are written in markdown",
 	}
 )
 
-func GetModule() (string, config.IModule) {
-	return "blog", &BlogModule{}
+// Module is the module to write blog on this website
+type Module struct {
+	file *config.FileConfig
 }
 
-// BlogModule is the module to write blog on this website
-type BlogModule struct {
-	getDB func() *DB
-}
-
-func (b *BlogModule) Initialize(data map[string]interface{}) error {
-	dbPath, err := config.GetDBFullPath(data)
+// Initialize ...
+func (b *Module) Initialize(data map[string]interface{}) error {
+	// Recoit les informations sur la personne dans la map
+	var err error
+	b.file, err = config.GetFileConfig(data)
 	if err != nil {
 		return err
-	}
-	b.getDB = func() *DB {
-		idb, _ := b.GetDBInstanceFactory(dbPath)()
-		return idb.(*DB)
 	}
 	return nil
 }
 
-func (b *BlogModule) GetInfo() config.ModuleInfo {
+// GetInfo ...
+func (b *Module) GetInfo() config.ModuleInfo {
 	return ModuleInfo
 }
-func (b *BlogModule) GetNeededAssets() []string {
+
+// GetNeededAssets ...
+func (b *Module) GetNeededAssets() []string {
 	return []string{
 		"/template/blog/index.html", "/template/blog/serie.html", "/template/blog/post.html",
 	}
 }
-func (b *BlogModule) GetPackageName() string {
-	return "github.com/berlingoqc/yawf/module/blog"
+
+// GetDBInstance ...
+func (b *Module) GetDBInstance() (db.IDB, error) {
+	blogDb := &DB{}
+	blogDb.Initialize(b.file.GetDBFilePath())
+	return blogDb, db.OpenDatabase(blogDb)
 }
 
-func (b *BlogModule) GetDBInstanceFactory(filepath string) func() (db.IDB, error) {
-	return func() (db.IDB, error) {
-		blogDb := &DB{}
-		blogDb.Initialize(filepath)
-		return blogDb, db.OpenDatabase(blogDb)
-	}
-}
-
-func (b *BlogModule) AddToWebServer(ws config.IWebServer) error {
-	blogRoute := ws.GetMux().PathPrefix("/blog").Subrouter()
-
-	wp := route.GetWPath("blog", blogRoute,
-		&route.RoutePath{ContentTmplPath: "/blog/index.html", Path: "/"},
-		&route.RoutePath{ContentTmplPath: "/blog/serie.html", Path: "/serie"},
-		&route.RoutePath{ContentTmplPath: "/blog/post.html", Path: "/post"},
-	)
-
-	nb := ws.GetNavigationBar()
+// GetNavigationItems ...
+func (b *Module) GetNavigationItems() []interface{} {
+	var ll []interface{}
 
 	dl := route.DropLink{
 		Title: "Blog",
@@ -89,11 +79,29 @@ func (b *BlogModule) AddToWebServer(ws config.IWebServer) error {
 		Name: "Post", URL: "/blog/post",
 	}
 
-	nb.Items = append(nb.Items, dl)
+	ll = append(ll, dl)
+	return ll
+}
+
+// GetTasks ...
+func (b *Module) GetTasks() []config.ITask {
+	return nil
+}
+
+// GetWPath ...
+func (b *Module) GetWPath(r *mux.Router) []*route.WPath {
+	var p []*route.WPath
+	blogRouter := r.PathPrefix("/blog").Subrouter()
+	wp := route.GetWPath("blog", blogRouter,
+		&route.RoutePath{ContentTmplPath: "/blog/index.html", Path: "/"},
+		&route.RoutePath{ContentTmplPath: "/blog/serie.html", Path: "/serie"},
+		&route.RoutePath{ContentTmplPath: "/blog/post.html", Path: "/post"},
+	)
 
 	wp.Route["/"].Handler = func(m map[string]interface{}, r *http.Request) {
 		var err error
-		idb := b.getDB()
+		iidb, _ := b.GetDBInstance()
+		idb := iidb.(*DB)
 		defer db.CloseDatabse(idb)
 		m["Series"], err = idb.GetSerieList(true)
 		if err != nil {
@@ -106,7 +114,8 @@ func (b *BlogModule) AddToWebServer(ws config.IWebServer) error {
 		}
 	}
 	wp.Route["/post"].Handler = func(m map[string]interface{}, r *http.Request) {
-		idb := b.getDB()
+		iidb, _ := b.GetDBInstance()
+		idb := iidb.(*DB)
 		defer db.CloseDatabse(idb)
 
 		var err error
@@ -138,7 +147,7 @@ func (b *BlogModule) AddToWebServer(ws config.IWebServer) error {
 	}
 
 	// Ajoutes mes routs d'api
-	apiBlog := ws.GetMux().PathPrefix("/api/blog").Subrouter()
+	apiBlog := r.PathPrefix("/api/blog").Subrouter()
 
 	apiBlog.Path("/post").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// get seulement le content depuis la bd
@@ -152,7 +161,8 @@ func (b *BlogModule) AddToWebServer(ws config.IWebServer) error {
 			w.Write([]byte(err.Error()))
 			return
 		}
-		idb := b.getDB()
+		iidb, _ := b.GetDBInstance()
+		idb := iidb.(*DB)
 		defer db.CloseDatabse(idb)
 		post, err := idb.GetBlogContent(id)
 		if err != nil {
@@ -163,8 +173,6 @@ func (b *BlogModule) AddToWebServer(ws config.IWebServer) error {
 		data := blackfriday.Run(post.PostMarkdown)
 		w.Write(data)
 	})
-
-	ws.AddRoute(wp)
-
-	return nil
+	p = append(p, wp)
+	return p
 }

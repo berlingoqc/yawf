@@ -1,133 +1,147 @@
 package base
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/berlingoqc/yawf/config"
 	"github.com/berlingoqc/yawf/db"
 	"github.com/berlingoqc/yawf/website/route"
+	"github.com/gorilla/mux"
 )
 
 var (
+	// ModuleInfo return the information about this module
 	ModuleInfo config.ModuleInfo = config.ModuleInfo{
 		Name:        "base",
+		Package:     "github.com/berlingoqc/yawf/module/base",
 		Description: "Enable by default with this module you can display personal and professional informations about yourself",
 	}
 )
 
+// GetModule return the module
 func GetModule() (string, config.IModule) {
 	return "base", &Module{}
 }
 
-// PersonalModule is the module for the personal pages
+// Module is the module for the personal pages
 type Module struct {
 	ownerInfo *config.OwnerInformation
-	root      string
-
-	getDb func() *DB
+	config    *config.BaseConfig
+	file      *config.FileConfig
 }
 
+// Initialize ...
 func (b *Module) Initialize(data map[string]interface{}) error {
 	// Recoit les informations sur la personne dans la map
-	if d, ok := data[config.KeyRootFolder]; ok {
-		b.root = d.(string)
-	} else {
-		return errors.New("Missing key " + config.KeyRootFolder)
-	}
-
-	b.ownerInfo = &config.OwnerInformation{}
-	err := config.MapToStruct(data, b.ownerInfo)
+	var err error
+	b.file, err = config.GetFileConfig(data)
 	if err != nil {
 		return err
 	}
-	b.getDb = func() *DB {
-		idb, err := b.GetDBInstanceFactory(b.root + "/" + config.DBName)()
-		if err != nil {
-			return nil
-		}
-		return idb.(*DB)
+	b.ownerInfo, err = config.GetOwnerInformation(data)
+	if err != nil {
+		return err
 	}
+	b.config, err = config.GetBaseConfig(data)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
-func (b *Module) GetPackageName() string {
-	return "github.com/berlingoqc/yawf/module/base"
-}
-
+// GetInfo ...
 func (b *Module) GetInfo() config.ModuleInfo {
 	return ModuleInfo
 }
 
-func (b *Module) GetDBInstanceFactory(filepath string) func() (db.IDB, error) {
-	return func() (db.IDB, error) {
-		idb := &DB{}
-		idb.Initialize(filepath)
-		return idb, db.OpenDatabase(idb)
-	}
+// GetDBInstance ...
+func (b *Module) GetDBInstance() (db.IDB, error) {
+	idb := &DB{}
+	idb.Initialize(b.file.GetDBFilePath())
+	return idb, db.OpenDatabase(idb)
 }
 
+// GetNeededAssets ...
 func (b *Module) GetNeededAssets() []string {
 	return []string{
-		"/template/index.html", "/template/denied.html", "/template/error.html",
-		"/template/shared/layout.html", "/template/shared/footer.html",
-		"/static/css/setupwizard.css", "/static/css/style_global.css", "/template/shared/markdown_page.html",
+		"/index.html", "/denied.html", "/error.html",
+		"/shared/layout.html", "/shared/footer.html",
+		"/static/css/setupwizard.css", "/static/css/style_global.css", "/shared/markdown_page.html",
 	}
 }
 
-func (b *Module) AddToWebServer(ws config.IWebServer) error {
-	wPath := route.GetWPath("base", ws.GetMux(),
+// GetNavigationItems ...
+func (b *Module) GetNavigationItems() []interface{} {
+	var listItems []interface{}
+	dl := route.DropLink{
+		Title: "Home",
+		Links: make([][]route.Link, 1),
+	}
+	dl.Links[0] = make([]route.Link, 1)
+
+	dl.Links[0][0] = route.Link{
+		Name: "Home", URL: "/",
+	}
+
+	if b.config.Contact {
+		dl.Links[0] = append(dl.Links[0], route.Link{
+			Name: "Contact", URL: "/contact",
+		})
+	}
+	if b.config.FAQ {
+		dl.Links[0] = append(dl.Links[0], route.Link{
+			Name: "FAQ", URL: "/faq",
+		})
+	}
+	if b.config.About {
+		dl.Links[0] = append(dl.Links[0], route.Link{
+			Name: "About", URL: "/about",
+		})
+	}
+	listItems = append(listItems, dl)
+	return listItems
+}
+
+// GetWidgets ...
+func (b *Module) GetWidgets() []*route.Widget {
+	return nil
+}
+
+// GetTasks ...
+func (b *Module) GetTasks() []config.ITask {
+	return nil
+}
+
+// GetWPath ...
+func (b *Module) GetWPath(r *mux.Router) []*route.WPath {
+	wPath := route.GetWPath("base", r,
 		&route.RoutePath{ContentTmplPath: "/index.html", Path: "/"},
 		&route.RoutePath{ContentTmplPath: "/denied.html", Path: "/denied"},
 		&route.RoutePath{ContentTmplPath: "/error.html", Path: "/error"},
 	)
 
-	nb := ws.GetNavigationBar()
-
-	dl := route.DropLink{
-		Title: "Basic",
-		Links: make([][]route.Link, 1),
-	}
-	dl.Links[0] = make([]route.Link, 3)
-
-	dl.Links[0][0] = route.Link{
-		Name: "Contact", URL: "/contact",
-	}
-	dl.Links[0][1] = route.Link{
-		Name: "FAQ", URL: "/faq",
+	wPath.Route["/"].Handler = func(m map[string]interface{}, r *http.Request) {
+		m["HasGitHub"] = false
 	}
 
-	dl.Links[0][2] = route.Link{
-		Name: "About", URL: "/about",
+	if b.config.Contact {
+		wPath.Route["/contact"] = route.GetMarkdownPage("/contact", "contact.md")
 	}
 
-	nb.Items = append(nb.Items, dl)
-
-	if b.ownerInfo.ContactPage {
-		wPath.Route["/contact"] = &route.RoutePath{ContentTmplPath: "/shared/markdown_page.html", Path: "/contact"}
-		wPath.Route["/contact"].Handler = func(m map[string]interface{}, r *http.Request) {
-			m["File"] = "contact.md"
-		}
+	if b.config.FAQ {
+		wPath.Route["/faq"] = route.GetMarkdownPage("/faq", "faq.md")
 	}
 
-	if b.ownerInfo.FAQ {
-		wPath.Route["/faq"] = &route.RoutePath{ContentTmplPath: "/shared/markdown_page.html", Path: "/faq"}
-		wPath.Route["/faq"].Handler = func(m map[string]interface{}, r *http.Request) {
-			m["File"] = "faq.md"
-		}
+	if b.config.About {
+		wPath.Route["/about"] = route.GetMarkdownPage("/about", "about.md")
 	}
 
-	if b.ownerInfo.About {
-		wPath.Route["/about"] = &route.RoutePath{ContentTmplPath: "/shared/markdown_page.html", Path: "/about"}
-		wPath.Route["/about"].Handler = func(m map[string]interface{}, r *http.Request) {
-			m["File"] = "about.md"
-		}
-	}
+	pathMd := r.Path("/md")
+	route.AddMarkdownFolderHandler(pathMd, b.file.GetRootFolder()+"/markdown")
 
-	pathMd := ws.GetMux().Path("/md")
-	route.AddMarkdownFolderHandler(pathMd, b.root+"/markdown")
+	var ll []*route.WPath
+	ll = append(ll, wPath)
 
-	ws.AddRoute(wPath)
-
-	return nil
+	return ll
 }

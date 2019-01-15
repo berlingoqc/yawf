@@ -6,39 +6,43 @@ import (
 	"github.com/berlingoqc/yawf/config"
 	"github.com/berlingoqc/yawf/db"
 	"github.com/berlingoqc/yawf/website/route"
+	"github.com/gorilla/mux"
 )
 
 var (
+	// ModuleInfo ...
 	ModuleInfo = config.ModuleInfo{
 		Name:        "user",
 		Description: "Add authentification for the website similar to Unix Right",
 	}
 )
 
+// GetModule ...
 func GetModule() (string, config.IModule) {
 	return "user", &Module{}
 }
 
+// Module ...
 type Module struct {
-	getDb func() *auth.AuthDB
+	file *config.FileConfig
 }
 
+// Initialize ...
 func (b *Module) Initialize(data map[string]interface{}) error {
-	dbPath, err := config.GetDBFullPath(data)
+	var err error
+	b.file, err = config.GetFileConfig(data)
 	if err != nil {
 		return err
 	}
-	b.getDb = func() *auth.AuthDB {
-		idb, _ := b.GetDBInstanceFactory(dbPath)()
-		return idb.(*auth.AuthDB)
-	}
-
 	return nil
 }
 
+// GetInfo ...
 func (b *Module) GetInfo() config.ModuleInfo {
 	return ModuleInfo
 }
+
+// GetNeededAssets ...
 func (b *Module) GetNeededAssets() []string {
 	return []string{
 		"/template/account/dashboard.html", "/template/account/dashboard_admin.html",
@@ -46,39 +50,50 @@ func (b *Module) GetNeededAssets() []string {
 	}
 }
 
-func (b *Module) GetPackageName() string {
-	return "github.com/berlingoqc/yawf/module/user"
+// GetDBInstance ...
+func (b *Module) GetDBInstance() (db.IDB, error) {
+	idb := &auth.AuthDB{}
+	idb.Initialize(b.file.GetDBFilePath())
+	return idb, db.OpenDatabase(idb)
 }
 
-func (b *Module) GetDBInstanceFactory(filepath string) func() (db.IDB, error) {
-	return func() (db.IDB, error) {
-		idb := &auth.AuthDB{}
-		idb.Initialize(filepath)
-		return idb, db.OpenDatabase(idb)
-	}
+// GetNavigationItems ...
+func (b *Module) GetNavigationItems() []interface{} {
+	var ll []interface{}
+	ll = append(ll, &route.Button{
+		Name:  "Account",
+		Style: "btn-success",
+		URL:   "/auth/login",
+	})
+	return ll
 }
 
-func (b *Module) AddToWebServer(ws config.IWebServer) error {
-	authRouter := ws.GetMux().PathPrefix("/auth").Subrouter()
+// GetWidgets ...
+func (b *Module) GetWidgets() []*route.Widget {
+	return nil
+}
+
+// GetTasks ...
+func (b *Module) GetTasks() []config.ITask {
+
+	return nil
+}
+
+// GetWPath ...
+func (b *Module) GetWPath(r *mux.Router) []*route.WPath {
+	var ll []*route.WPath
+	authRouter := r.PathPrefix("/auth").Subrouter()
 
 	wPath := route.GetWPath("auth", authRouter,
 		&route.RoutePath{ContentTmplPath: "/login/login.html", Path: "/login"},
 		&route.RoutePath{ContentTmplPath: "/login/new.html", Path: "/new"},
 		&route.RoutePath{ContentTmplPath: "/login/confirm.html", Path: "/confirm"},
 	)
-	// Ajoute notre info a la navbar
-	nb := ws.GetNavigationBar()
-	nb.Buttons = append(nb.Buttons, route.Button{
-		Name:  "Account",
-		Style: "btn-success",
-		URL:   "/auth/login",
-	})
-
 	wPath.AddMiddleware(api.MiddlewareAuth)
 
-	ws.AddRoute(wPath)
+	ll = append(ll, wPath)
 
-	accountRouter := ws.GetMux().PathPrefix("/account").Subrouter()
+	accountRouter := r.PathPrefix("/account").Subrouter()
 
 	aPath := route.GetWPath("account", accountRouter,
 		&route.RoutePath{ContentTmplPath: "/account/dashboard_admin.html", Path: "/admin/"},
@@ -87,16 +102,20 @@ func (b *Module) AddToWebServer(ws config.IWebServer) error {
 
 	aPath.AddMiddleware(api.MiddlewareAccount)
 
-	ws.AddRoute(aPath)
+	ll = append(ll, aPath)
 
-	apiRouter := ws.GetMux().PathPrefix("/api").Subrouter()
+	apiRouter := r.PathPrefix("/api").Subrouter()
 
 	// Ajout l'api pour authenfier les users
-	userApi := &api.UserAPI{
-		Db: b.getDb(),
+	idb, _ := b.GetDBInstance()
+	userAPI := &api.UserAPI{
+		Db: idb.(*auth.AuthDB),
 	}
 
-	err := userApi.Initialize(apiRouter)
+	err := userAPI.Initialize(apiRouter)
+	if err != nil {
+		panic(err)
+	}
 
-	return err
+	return ll
 }

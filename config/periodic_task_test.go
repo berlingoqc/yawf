@@ -9,12 +9,12 @@ func TestPeriodicTask(t *testing.T) {
 	i := 0
 	p := &PeriodicTask{
 		Frequency: 5 * time.Second,
-		Task: func(c chan *Signal, args ...interface{}) {
-			i += 1
+		Task: func(c chan *Signal, m map[string]interface{}) {
+			i++
 		},
 	}
 
-	p.Enable()
+	p.Enable(nil)
 
 	timeChan := time.NewTimer(20 * time.Second)
 
