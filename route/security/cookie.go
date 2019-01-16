@@ -1,9 +1,8 @@
-package api
+package security
 
 import (
 	"net/http"
 
-	"github.com/berlingoqc/yawf/auth"
 	"github.com/gorilla/schema"
 	"github.com/gorilla/securecookie"
 )
@@ -21,7 +20,7 @@ var decoder = schema.NewDecoder()
 var encoder = schema.NewEncoder()
 
 // SetCookieForUser crée une cookie de securiter avec les informations d'un account
-func SetCookieForUser(user *auth.User) (*http.Cookie, error) {
+func SetCookieForUser(user *User) (*http.Cookie, error) {
 	if encoded, err := secureCookie.Encode(authCookieName, user); err == nil {
 		cookie := &http.Cookie{
 			Name:  authCookieName,
@@ -35,9 +34,9 @@ func SetCookieForUser(user *auth.User) (*http.Cookie, error) {
 }
 
 // DecodeCookieForUser decode le cookie
-func DecodeCookieForUser(r *http.Request) (*auth.User, error) {
+func DecodeCookieForUser(r *http.Request) (*User, error) {
 	if cookie, e := r.Cookie(authCookieName); e == nil {
-		u := &auth.User{}
+		u := &User{}
 		return u, secureCookie.Decode(authCookieName, cookie.Value, &u)
 	} else {
 		return nil, e

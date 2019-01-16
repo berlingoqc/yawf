@@ -1,11 +1,9 @@
 package user
 
 import (
-	"github.com/berlingoqc/yawf/api"
-	"github.com/berlingoqc/yawf/auth"
 	"github.com/berlingoqc/yawf/config"
 	"github.com/berlingoqc/yawf/db"
-	"github.com/berlingoqc/yawf/website/route"
+	"github.com/berlingoqc/yawf/route"
 	"github.com/gorilla/mux"
 )
 
@@ -45,14 +43,14 @@ func (b *Module) GetInfo() config.ModuleInfo {
 // GetNeededAssets ...
 func (b *Module) GetNeededAssets() []string {
 	return []string{
-		"/template/account/dashboard.html", "/template/account/dashboard_admin.html",
-		"/template/login/confirm.html", "/template/login/login.html", "/template/login/new.html",
+		"/account/dashboard.html", "/account/dashboard_admin.html",
+		"/login/confirm.html", "/login/login.html", "/login/new.html",
 	}
 }
 
 // GetDBInstance ...
 func (b *Module) GetDBInstance() (db.IDB, error) {
-	idb := &auth.AuthDB{}
+	idb := &AuthDB{}
 	idb.Initialize(b.file.GetDBFilePath())
 	return idb, db.OpenDatabase(idb)
 }
@@ -84,38 +82,26 @@ func (b *Module) GetWPath(r *mux.Router) []*route.WPath {
 	var ll []*route.WPath
 	authRouter := r.PathPrefix("/auth").Subrouter()
 
-	wPath := route.GetWPath("auth", authRouter,
-		&route.RoutePath{ContentTmplPath: "/login/login.html", Path: "/login"},
-		&route.RoutePath{ContentTmplPath: "/login/new.html", Path: "/new"},
-		&route.RoutePath{ContentTmplPath: "/login/confirm.html", Path: "/confirm"},
+	wPath := route.GetWPath("auth", authRouter)
+
+	route.AddWPathItem(wPath,
+		route.GetCPath("/login", "/login/login.html"),
+		route.GetCPath("/new", "/login/new.html"),
+		route.GetCPath("/confirm", "/login/confirm.html"),
 	)
-	wPath.AddMiddleware(api.MiddlewareAuth)
 
 	ll = append(ll, wPath)
 
 	accountRouter := r.PathPrefix("/account").Subrouter()
 
-	aPath := route.GetWPath("account", accountRouter,
-		&route.RoutePath{ContentTmplPath: "/account/dashboard_admin.html", Path: "/admin/"},
-		&route.RoutePath{ContentTmplPath: "/account/dashboard.html", Path: "/dashboard"},
+	aPath := route.GetWPath("account", accountRouter)
+
+	route.AddWPathItem(aPath,
+		route.GetCPath("/admin", "/account/dashboard_admin.html"),
+		route.GetCPath("/dashboard", "/account/dashboard.html"),
 	)
 
-	aPath.AddMiddleware(api.MiddlewareAccount)
-
 	ll = append(ll, aPath)
-
-	apiRouter := r.PathPrefix("/api").Subrouter()
-
-	// Ajout l'api pour authenfier les users
-	idb, _ := b.GetDBInstance()
-	userAPI := &api.UserAPI{
-		Db: idb.(*auth.AuthDB),
-	}
-
-	err := userAPI.Initialize(apiRouter)
-	if err != nil {
-		panic(err)
-	}
 
 	return ll
 }

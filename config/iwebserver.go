@@ -3,7 +3,7 @@ package config
 import (
 	"log"
 
-	"github.com/berlingoqc/yawf/website/route"
+	"github.com/berlingoqc/yawf/route"
 	"github.com/gorilla/mux"
 )
 

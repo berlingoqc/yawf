@@ -1,8 +1,10 @@
-package auth
+package user
 
 import (
 	"os"
 	"testing"
+
+	"github.com/berlingoqc/yawf/route/security"
 )
 
 const dbName = "authdb.sql"
@@ -58,7 +60,7 @@ func TestAuthDB(t *testing.T) {
 		t.Fatal("Devrait throw erreur le mot de passe doit avec ete changer")
 	}
 
-	u, err := authdb.CreateAccount("yawf", "office", RoleNormal)
+	u, err := authdb.CreateAccount("yawf", "office", security.RoleNormal)
 	if err != nil {
 		t.Fatal(err)
 	}

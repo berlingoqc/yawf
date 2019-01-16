@@ -3,10 +3,10 @@ package website
 import (
 	"os"
 
-	"github.com/berlingoqc/yawf/auth"
 	"github.com/berlingoqc/yawf/config"
 	"github.com/berlingoqc/yawf/conv"
 	"github.com/berlingoqc/yawf/db"
+	"github.com/berlingoqc/yawf/module/user"
 	"github.com/berlingoqc/yawf/utility"
 )
 
@@ -42,6 +42,7 @@ func NewWebSiteConfig(name string, rootdirectory string, password string, baseCo
 	optBase := make(map[string]interface{})
 	conv.AddStructToMap(optBase, baseConfig)
 	wsConfig.EnableModule["base"] = optBase
+	wsConfig.EnableModule["user"] = nil
 
 	// Valide le dossier ( doit etre vide )
 	if err := utility.IsDirectoryEmpty(rootdirectory); err != nil {
@@ -71,7 +72,7 @@ func NewWebSiteConfig(name string, rootdirectory string, password string, baseCo
 		return nil, err
 	}
 	defer db.CloseDatabse(bdb)
-	userdb := bdb.(*auth.AuthDB)
+	userdb := bdb.(*user.AuthDB)
 	_, err = userdb.CreateAdminAccount(password)
 
 	return wsConfig, nil

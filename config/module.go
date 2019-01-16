@@ -5,7 +5,7 @@ import (
 	"plugin"
 	"strings"
 
-	"github.com/berlingoqc/yawf/website/route"
+	"github.com/berlingoqc/yawf/route"
 	"github.com/gorilla/mux"
 
 	"github.com/berlingoqc/yawf/db"

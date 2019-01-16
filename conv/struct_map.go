@@ -3,8 +3,10 @@ package conv
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -38,16 +40,100 @@ func IsTagAttributePresent(f reflect.StructField, tag string, attr string) bool 
 
 // GetUnderlyingType retourne informations about the type
 // behind the interface{} and the ptr ( must be )
-func GetUnderlyingType(t interface{}) (string, reflect.Type, error) {
+func GetUnderlyingType(t interface{}) (string, reflect.Type, reflect.Value, error) {
 	typeT := reflect.TypeOf(t)
 	typeName := typeT.Name()
+	values := reflect.ValueOf(t)
 	if typeT.Kind() != reflect.Ptr {
-		return typeName, typeT, &NotPointerError{
+		return typeName, typeT, values, &NotPointerError{
 			Type: typeName,
 		}
 	}
 	typeT = typeT.Elem()
-	return typeT.Name(), typeT, nil
+	return typeT.Name(), typeT, values.Elem(), nil
+}
+
+func getFieldQuery(elem string, sf *reflect.StructField, fv *reflect.Value) error {
+	switch fv.Type().Kind() {
+	case reflect.String:
+		fv.SetString(elem)
+	case reflect.Int:
+		i, err := strconv.Atoi(elem)
+		if err != nil {
+			return err
+		}
+		fv.SetInt(int64(i))
+	}
+
+	return nil
+}
+
+// QueryToStruct get the value of the struct from the value of the query
+func QueryToStruct(q map[string][]string, t interface{}) error {
+	_, typeT, values, err := GetUnderlyingType(t)
+	if err != nil {
+		return err
+	}
+	for i := 0; i < typeT.NumField(); i++ {
+		ft := typeT.Field(i)
+		fv := values.Field(i)
+		if elems, ok := q[ft.Name]; ok {
+			if fv.Type().Kind() == reflect.Array {
+
+			} else {
+				if len(elems) == 1 {
+					err = getFieldQuery(elems[0], &ft, &fv)
+					if err != nil {
+						return err
+					}
+				} else {
+					// erreur field unique
+				}
+			}
+		} else {
+			// valide si required
+		}
+	}
+	return nil
+}
+
+func addField(query []string, sf *reflect.StructField, fv *reflect.Value) ([]string, error) {
+	var s string
+	switch fv.Type().Kind() {
+	case reflect.String:
+		s = fv.String()
+	case reflect.Int:
+		s = fmt.Sprintf("%v", fv.Int())
+	default:
+		return query, nil
+	}
+	query = append(query, sf.Name+"="+s)
+	return query, nil
+}
+
+// StructToQuery add a struct to an http query with reflection
+func StructToQuery(t interface{}) (string, error) {
+	_, typeT, values, err := GetUnderlyingType(t)
+	if err != nil {
+		return "", err
+	}
+	var elems []string
+	for i := 0; i < typeT.NumField(); i++ {
+		ft := typeT.Field(i)
+		fv := values.Field(i)
+		if fv.Type().Kind() == reflect.Array {
+		} else {
+			elems, err = addField(elems, &ft, &fv)
+			if err != nil {
+				return "", err
+			}
+		}
+	}
+	// Generate the query string
+	elemsStr := strings.Join(elems, "&")
+	query := "?" + elemsStr
+
+	return query, nil
 }
 
 // AddStructToMap add a new structure with is field to a map
@@ -73,12 +159,10 @@ func AddStructToMap(m map[string]interface{}, t interface{}) error {
 // and there value in the interface{}
 func StructToMap(t interface{}) (string, map[string]interface{}, error) {
 	m := make(map[string]interface{})
-	_, typeT, err := GetUnderlyingType(t)
+	_, typeT, values, err := GetUnderlyingType(t)
 	if err != nil {
 		return "", nil, err
 	}
-	values := reflect.ValueOf(t)
-	values = values.Elem()
 
 	for i := 0; i < typeT.NumField(); i++ {
 		ft := typeT.Field(i)
@@ -102,7 +186,7 @@ func StructToMap(t interface{}) (string, map[string]interface{}, error) {
 // is so extract it to the interface
 func FindStructMap(m map[string]interface{}, t interface{}) error {
 	// Get le nom du type et regarde s'il est present dans ma map
-	name, _, err := GetUnderlyingType(t)
+	name, _, _, err := GetUnderlyingType(t)
 	if err != nil {
 		return err
 	}
@@ -126,12 +210,10 @@ func FindStructMap(m map[string]interface{}, t interface{}) error {
 
 // MapToStruct convert a map to a Struct searching for the Type name for the key
 func MapToStruct(m map[string]interface{}, t interface{}) error {
-	_, typeT, err := GetUnderlyingType(t)
+	_, typeT, values, err := GetUnderlyingType(t)
 	if err != nil {
 		return err
 	}
-	values := reflect.ValueOf(t)
-	values = values.Elem()
 
 	for i := 0; i < typeT.NumField(); i++ {
 		ft := typeT.Field(i)

@@ -1,11 +1,9 @@
 package base
 
 import (
-	"net/http"
-
 	"github.com/berlingoqc/yawf/config"
 	"github.com/berlingoqc/yawf/db"
-	"github.com/berlingoqc/yawf/website/route"
+	"github.com/berlingoqc/yawf/route"
 	"github.com/gorilla/mux"
 )
 
@@ -115,30 +113,26 @@ func (b *Module) GetTasks() []config.ITask {
 
 // GetWPath ...
 func (b *Module) GetWPath(r *mux.Router) []*route.WPath {
-	wPath := route.GetWPath("base", r,
-		&route.RoutePath{ContentTmplPath: "/index.html", Path: "/"},
-		&route.RoutePath{ContentTmplPath: "/denied.html", Path: "/denied"},
-		&route.RoutePath{ContentTmplPath: "/error.html", Path: "/error"},
+	wPath := route.GetWPath("/", r)
+	route.AddWPathItem(wPath,
+		route.GetCPath("/", "/index.html"),
+		route.GetMPathFile("/markdown", b.file.GetMarkdownPath()),
 	)
 
-	wPath.Route["/"].Handler = func(m map[string]interface{}, r *http.Request) {
-		m["HasGitHub"] = false
-	}
-
 	if b.config.Contact {
-		wPath.Route["/contact"] = route.GetMarkdownPage("/contact", "contact.md")
+		c := route.GetCPathMarkdown("/contact", "contact.md")
+		route.AddWPathItem(wPath, c)
 	}
 
 	if b.config.FAQ {
-		wPath.Route["/faq"] = route.GetMarkdownPage("/faq", "faq.md")
+		c := route.GetCPathMarkdown("/faq", "faq.md")
+		route.AddWPathItem(wPath, c)
 	}
 
 	if b.config.About {
-		wPath.Route["/about"] = route.GetMarkdownPage("/about", "about.md")
+		c := route.GetCPathMarkdown("/about", "about.md")
+		route.AddWPathItem(wPath, c)
 	}
-
-	pathMd := r.Path("/md")
-	route.AddMarkdownFolderHandler(pathMd, b.file.GetRootFolder()+"/markdown")
 
 	var ll []*route.WPath
 	ll = append(ll, wPath)

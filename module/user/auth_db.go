@@ -1,10 +1,11 @@
-package auth
+package user
 
 import (
 	"database/sql"
 	"fmt"
 
 	"github.com/berlingoqc/yawf/db"
+	"github.com/berlingoqc/yawf/route/security"
 )
 
 type AccountErrType string
@@ -80,11 +81,11 @@ func (a *AuthDB) DoesAccountExists(username string) (bool, error) {
 	return (i == 1), nil
 }
 
-func (a *AuthDB) CreateAdminAccount(password string) (*User, error) {
-	return a.CreateAccount(UsernameAdmin, password, RoleAdmin)
+func (a *AuthDB) CreateAdminAccount(password string) (*security.User, error) {
+	return a.CreateAccount(UsernameAdmin, password, security.RoleAdmin)
 }
 
-func (a *AuthDB) CreateAccount(username string, password string, role Role) (*User, error) {
+func (a *AuthDB) CreateAccount(username string, password string, role security.Role) (*security.User, error) {
 	if b, e := a.DoesAccountExists(username); e != nil || b {
 		if e == nil {
 			e = &AccountError{
@@ -95,7 +96,7 @@ func (a *AuthDB) CreateAccount(username string, password string, role Role) (*Us
 		return nil, e
 	}
 
-	hashPw, e := getSaltedHash(password)
+	hashPw, e := security.GetSaltedHash(password)
 	if e != nil {
 		return nil, e
 	}
@@ -108,13 +109,13 @@ func (a *AuthDB) CreateAccount(username string, password string, role Role) (*Us
 	return a.LoginUser(username, password)
 }
 
-func (a *AuthDB) LoginUser(username string, password string) (*User, error) {
-	user := &User{Username: username}
+func (a *AuthDB) LoginUser(username string, password string) (*security.User, error) {
+	user := &security.User{Username: username}
 	err := a.DB.DB.QueryRow(QUERY_accountlogin, username).Scan(&user.ID, &user.SaltedPW, &user.Role)
 	if err != nil {
 		return nil, err
 	}
-	return user, validPassword(password, user.SaltedPW)
+	return user, security.ValidPassword(password, user.SaltedPW)
 }
 
 func (a *AuthDB) IsValidUser(id int, hash string) error {
@@ -132,7 +133,7 @@ func (a *AuthDB) UpdateAccountPassword(id int, oldhash string, newpw string) err
 	if e := a.IsValidUser(id, oldhash); e != nil {
 		return e
 	}
-	hash, e := getSaltedHash(newpw)
+	hash, e := security.GetSaltedHash(newpw)
 	if e != nil {
 		return e
 	}
@@ -143,15 +144,15 @@ func (a *AuthDB) DeleteAccount(id int) error {
 	return a.DB.StmtQuery(QUERY_delete_account, id)
 }
 
-func (a *AuthDB) GetListAccount() ([]*User, error) {
+func (a *AuthDB) GetListAccount() ([]*security.User, error) {
 	rows, err := a.DB.DB.Query(QUERY_listaccout)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var users []*User
+	var users []*security.User
 	for rows.Next() {
-		u := &User{}
+		u := &security.User{}
 		err = rows.Scan(&u.ID, &u.Username, &u.Role)
 		if err != nil {
 			return users, err

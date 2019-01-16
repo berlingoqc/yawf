@@ -1,0 +1,12 @@
+{{define "content"}}
+
+­<div class="container" style="padding: 10px">
+    <div class="col" id="divMd">
+    </div>
+</div>
+
+<script>
+    $('#divMd').load({{print "/md?name=" .File}})
+</script>
+
+{{end}}

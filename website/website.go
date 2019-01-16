@@ -18,7 +18,7 @@ import (
 
 	"github.com/berlingoqc/yawf/config"
 
-	"github.com/berlingoqc/yawf/website/route"
+	"github.com/berlingoqc/yawf/route"
 
 	"github.com/gorilla/mux"
 )
@@ -131,6 +131,10 @@ func (w *WebServer) Setup(configWs *config.WebSite) error {
 		return m
 
 	}
+	// Configure les variables d'env pour les CPath
+	route.AssetFolder = configWs.File.GetAssetFolderPath()
+	route.FooterTmpl = "/shared/footer.html"
+	route.LayoutTmpl = "/shared/layout.html"
 
 	// Creation de mon handler pour servir les fichiers statiques
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir(w.Config.File.GetStaticFolderPath()))))
@@ -146,9 +150,13 @@ func (w *WebServer) Setup(configWs *config.WebSite) error {
 
 	for k, v := range w.Config.EnableModule {
 		if module := config.GetModule(k); module != nil {
-			vv := v.(map[string]interface{})
-			utility.ConcatMap(vv, ctx)
-			err = module.Initialize(vv)
+			if v != nil {
+				vv := v.(map[string]interface{})
+				utility.ConcatMap(vv, ctx)
+				err = module.Initialize(vv)
+			} else {
+				err = module.Initialize(ctx)
+			}
 			if err != nil {
 				return err
 			}
@@ -184,9 +192,7 @@ func (w *WebServer) Setup(configWs *config.WebSite) error {
 	}
 
 	for _, r := range w.Routes {
-		if err := r.Initialize(w.Config.File.GetAssetFolderPath()); err != nil {
-			return err
-		}
+		route.InitializeWPath(r, nil)
 	}
 
 	return nil
