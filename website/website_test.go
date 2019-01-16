@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/berlingoqc/yawf/config"
+	"github.com/berlingoqc/yawf/module/base"
+	"github.com/berlingoqc/yawf/module/user"
 )
 
 var (
@@ -15,6 +17,11 @@ var (
 
 func init() {
 	directoryAsset, _ = os.Getwd()
+	var name string
+	name, BaseModule = base.GetModule()
+	config.AddAvailableModule(name, BaseModule)
+	name, UserModule = user.GetModule()
+	config.AddAvailableModule(name, UserModule)
 }
 
 func RemoveContents(dir string) error {
@@ -31,29 +38,48 @@ func RemoveContents(dir string) error {
 	return nil
 }
 
+func TestLoadWebSite(t *testing.T) {
+	ws, err := StartWebServer("/home/wq/go/src/github.com/berlingoqc/yawf/website/root/wquintal.json")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ws.Stop()
+}
 func TestInitializeWebSite(t *testing.T) {
 	directoryAsset += "/root"
 	RemoveContents(directoryAsset)
 
-	n, _, err := config.LoadModuleDynamicly("/home/wq/go/src/github.com/berlingoqc/yawf/module/blog/module/module.so")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Log(n)
+	/*
+		buildBlog := &config.BuildModule{
+			Name: "blog",
+			Path: "/home/wq/go/src/github.com/berlingoqc/yawf/website/root/module/blog.so",
 
-	wsConfig, err := NewWebSiteConfig("wquintal", directoryAsset, &config.BaseConfig{
+			Info: &config.ModuleInfo{
+				RootPkg: "github.com/berlingoqc/yawf",
+				SubPkg:  "module/blog",
+				Package: "github.com/berlingoqc/yawf/module/blog",
+			},
+		}
+
+	*/
+	wsConfig, err := NewWebSiteConfig("wquintal", directoryAsset, "office", &config.BaseConfig{
 		About: true,
 		FAQ:   true,
 	}, &config.OwnerInformation{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	wsConfig.EnableModule[n] = make(map[string]interface{})
+
+	/*
+		wsConfig.AvailableModule["blog"] = buildBlog
+		wsConfig.EnableModule["blog"] = make(map[string]interface{})
+	*/
 	err = wsConfig.Save()
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	ws, err := StartWebServer(wsConfig.File.GetConfigPath())
 	if err != nil {
 		t.Fatal(err)

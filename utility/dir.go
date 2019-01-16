@@ -6,6 +6,18 @@ import (
 	"os"
 )
 
+// EnsureFolderExists ensure that all folder given exists ( created if not)
+func EnsureFolderExists(folders []string) error {
+	for _, f := range folders {
+		err := os.MkdirAll(f, 0744)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // IsDirectoryEmpty return nil if the directory is empty
 func IsDirectoryEmpty(direc string) error {
 	f, err := os.Open(direc)

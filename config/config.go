@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -87,11 +88,23 @@ type NetworkOptions struct {
 // FileConfig contains the information about the location
 // of the different composant of the website
 type FileConfig struct {
-	RootFolder   string
-	DBFile       string
-	AssetFolder  string
-	StaticFolder string
-	ConfigFile   string
+	RootFolder     string
+	DBFile         string
+	AssetFolder    string
+	StaticFolder   string
+	ConfigFile     string
+	MarkdownFolder string
+	ModuleFolder   string
+}
+
+// GetModulePath return the full path of the module folder
+func (f *FileConfig) GetModulePath() string {
+	return f.RootFolder + "/" + f.ModuleFolder
+}
+
+// GetMarkdownPath return the full path of the configuration file
+func (f *FileConfig) GetMarkdownPath() string {
+	return f.RootFolder + "/" + f.MarkdownFolder
 }
 
 // GetConfigPath return the full path of the configuration file
@@ -119,11 +132,31 @@ func (f *FileConfig) GetStaticFolderPath() string {
 	return f.GetAssetFolderPath() + "/" + f.StaticFolder
 }
 
+// GetFolderPathList return the fullpath of all required folder
+func (f *FileConfig) GetFolderPathList() []string {
+	return []string{
+		f.GetRootFolder(),
+		f.GetAssetFolderPath(),
+		f.GetStaticFolderPath(),
+		f.GetMarkdownPath(),
+		f.GetMarkdownPath(),
+	}
+}
+
 // BaseConfig represent the configuration of the base module
 type BaseConfig struct {
 	Contact bool
 	About   bool
 	FAQ     bool
+}
+
+// BuildModule represent the information for a build module that can be loaded
+type BuildModule struct {
+	Name    string
+	Version string
+	Path    string
+
+	Info *ModuleInfo
 }
 
 // WebSite is the struct that hold all the information that is provides by the main configuration file
@@ -146,6 +179,9 @@ type WebSite struct {
 
 	// EnableModule contains the module enable key = name and ther options
 	EnableModule map[string]interface{}
+
+	// AvailableModule contains the informations of the shared module install in this computer
+	AvailableModule map[string]*BuildModule
 }
 
 // ToContext convert the struct to a my context map
@@ -157,11 +193,50 @@ func (w *WebSite) ToContext() Ctx {
 	m["Name"] = w.Name
 	m["AppUsers"] = w.AppUsers
 	m["EnableModule"] = w.EnableModule
+	m["AvailableModule"] = w.AvailableModule
 	return m
 }
 
 // Validate ensure that all required struct are well configurate and that the root folder exists
 func (w *WebSite) Validate() error {
+
+	// Validate that the root folder have all the required things
+
+	// Ensure that all the module are loaded
+	for k := range w.EnableModule {
+		// Regarde s'il est deja loader ( comme pour les modules de base)
+		if m := GetModule(k); m == nil {
+			// if not load watch if it's in the available shared module
+			// list of the config
+			if bm, ok := w.AvailableModule[k]; ok {
+				fmt.Printf("Loading module %v at %v\n", bm.Name, bm.Path)
+				_, mod, err := LoadModuleDynamicly(bm.Path)
+				if err != nil {
+					// Si l'erreur est de type Version
+					// on peut le rebuilder
+					if _, ok := err.(*VersionError); ok {
+						log.Printf("Versioning error with existing module rebuilding it\n")
+						info := bm.Info
+						bm, err = GoBuildModule(info.RootPkg, info.SubPkg, w.File.GetModulePath())
+						if err != nil {
+							return err
+						}
+						log.Printf("Build successful, loading again\n")
+						if _, _, err = LoadModuleDynamicly(bm.Path); err != nil {
+							return err
+						}
+
+					}
+					return err
+				}
+				modInfo := mod.GetInfo()
+				bm.Info = &modInfo
+			} else {
+				return errors.New("Can't find module " + k)
+			}
+		}
+	}
+	log.Printf("Module is loaded\n")
 
 	return nil
 }
@@ -205,6 +280,24 @@ func LoadWebSiteConfig(filePath string) (*WebSite, error) {
 
 	ws.AppUsers = m["AppUsers"].(map[string]interface{})
 	ws.EnableModule = m["EnableModule"].(map[string]interface{})
+	ws.AvailableModule = make(map[string]*BuildModule)
+	for k, v := range m["AvailableModule"].(map[string]interface{}) {
+		t := &BuildModule{
+			Info: &ModuleInfo{},
+		}
+		err := conv.MapToStruct(v.(map[string]interface{}), t)
+		if err != nil {
+			return nil, err
+		}
+		mapInfo := v.(map[string]interface{})["Info"]
+		err = conv.MapToStruct(mapInfo.(map[string]interface{}), t.Info)
+		if err != nil {
+			return nil, err
+		}
+		log.Print(*t)
+		ws.AvailableModule[k] = t
+
+	}
 
 	return ws, nil
 }

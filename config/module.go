@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"plugin"
+	"strings"
 
 	"github.com/berlingoqc/yawf/website/route"
 	"github.com/gorilla/mux"
@@ -41,6 +42,8 @@ func GetModules() map[string]IModule {
 // disponible dans le framework
 type ModuleInfo struct {
 	Name        string
+	RootPkg     string
+	SubPkg      string
 	Package     string
 	Version     string
 	Description string
@@ -74,12 +77,26 @@ type IModule interface {
 	GetWPath(*mux.Router) []*route.WPath
 }
 
+// VersionError error that tell that the module version is incompatible
+// with the current version of this program
+type VersionError struct {
+	Msg string
+}
+
+func (v *VersionError) Error() string {
+	return v.Msg
+}
+
 // LoadModuleDynamicly try to open a shared modules and find
 // the function with the signature func GetModule() (string,IModule)
 // and return the result of the call to this function is present
 func LoadModuleDynamicly(filepath string) (string, IModule, error) {
 	p, err := plugin.Open(filepath)
 	if err != nil {
+		// Regarde si l'erreur est que le package n'est pas a jour
+		if strings.Contains(err.Error(), "plugin was built with a different version") {
+			return "", nil, &VersionError{Msg: err.Error()}
+		}
 		return "", nil, err
 	}
 

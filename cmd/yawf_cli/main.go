@@ -1,15 +1,7 @@
 package main
 
 import (
-	"net/http"
-
-	"github.com/berlingoqc/yawf/cli"
 	ishell "gopkg.in/abiosoft/ishell.v2"
-)
-
-var (
-	// AuthCookie est mon cookie pour m'authentifier lors des requetes
-	AuthCookie *http.Cookie
 )
 
 func main() {
@@ -19,13 +11,13 @@ func main() {
 	shell.AddCmd(&ishell.Cmd{
 		Name: "init",
 		Help: "initialize the context",
-		Func: cli.InitWebsiteCMD,
+		Func: InitNewWebsite,
 	})
 
 	shell.AddCmd(&ishell.Cmd{
-		Name: "login",
-		Help: "Login with the user admin to performe task on website",
-		Func: cli.LoginAdminCMD,
+		Name: "load",
+		Help: "Load a website context information to make operation on it",
+		Func: nil,
 	})
 
 	shell.Run()

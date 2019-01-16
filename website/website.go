@@ -1,4 +1,4 @@
-// website contient le code pour demarrer un site web deja configurer
+// Package website contient le code pour demarrer un site web deja configurer
 package website
 
 import (
@@ -23,11 +23,18 @@ import (
 	"github.com/gorilla/mux"
 )
 
+var (
+	// UserModule instance
+	UserModule config.IModule
+	// BaseModule instance
+	BaseModule config.IModule
+)
+
 func init() {
-	name, module := base.GetModule()
-	config.AddAvailableModule(name, module)
-	name, module = user.GetModule()
-	config.AddAvailableModule(name, module)
+	name, BaseModule := base.GetModule()
+	config.AddAvailableModule(name, BaseModule)
+	name, UserModule = user.GetModule()
+	config.AddAvailableModule(name, UserModule)
 }
 
 // WebServer my webserver that work with my modules implements of IWebServer
