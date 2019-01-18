@@ -1,5 +1,7 @@
 package main
 
+// #vagin
+
 import (
 	"flag"
 	"fmt"
