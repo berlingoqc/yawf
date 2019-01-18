@@ -27,8 +27,8 @@ require (
 	golang.org/x/arch v0.0.0-20181203225421-5a4828bb7045 // indirect
 	golang.org/x/crypto v0.0.0-20190103213133-ff983b9c42bc
 	golang.org/x/net v0.0.0-20190110200230-915654e7eabc // indirect
-	golang.org/x/oauth2 v0.0.0-20190111185915-36a7019397c4 // indirect
-	golang.org/x/sys v0.0.0-20190114130336-2be517255631 // indirect
+	golang.org/x/oauth2 v0.0.0-20190115181402-5dab4167f31c // indirect
+	golang.org/x/sys v0.0.0-20190116161447-11f53e031339 // indirect
 	gopkg.in/abiosoft/ishell.v2 v2.0.0
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df // indirect
 	gopkg.in/yaml.v2 v2.2.2 // indirect

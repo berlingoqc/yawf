@@ -4,6 +4,7 @@ import (
 	"github.com/berlingoqc/yawf/config"
 	"github.com/berlingoqc/yawf/db"
 	"github.com/berlingoqc/yawf/route"
+	"github.com/berlingoqc/yawf/route/security"
 	"github.com/gorilla/mux"
 )
 
@@ -11,6 +12,9 @@ var (
 	// ModuleInfo ...
 	ModuleInfo = config.ModuleInfo{
 		Name:        "user",
+		Package:     "github.com/berlingoqc/yawf/module/user",
+		RootPkg:     "github.com/berlingoqc/yawf",
+		SubPkg:      "module/user",
 		Description: "Add authentification for the website similar to Unix Right",
 	}
 )
@@ -94,12 +98,22 @@ func (b *Module) GetWPath(r *mux.Router) []*route.WPath {
 
 	accountRouter := r.PathPrefix("/account").Subrouter()
 
-	aPath := route.GetWPath("account", accountRouter)
+	aPath := route.GetWPath("/account", accountRouter)
 
 	route.AddWPathItem(aPath,
 		route.GetCPath("/admin", "/account/dashboard_admin.html"),
 		route.GetCPath("/dashboard", "/account/dashboard.html"),
 	)
+	// Ajoute de la securiter globale pour le path account avec seulement
+	// droit rw au user.
+	aPath.Security = &security.PathSecurity{
+		Owner:        "admin",
+		Group:        "user",
+		RoleRequired: security.RoleNormal,
+		Right:        [3]security.Right{security.RightWrite & security.RightRead, security.RightRead, security.RightNone},
+	}
+
+	// Ajoute droit seulement au role admin au /admin
 
 	ll = append(ll, aPath)
 

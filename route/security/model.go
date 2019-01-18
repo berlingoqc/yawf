@@ -18,6 +18,8 @@ const (
 	RightWrite Right = 2
 	// RightExecute is the right to execute (?delete?)
 	RightExecute Right = 1
+	// RightNone is a no right
+	RightNone Right = 0
 )
 
 // Have tell if this right contains this one

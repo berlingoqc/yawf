@@ -43,6 +43,10 @@ type IUserRepo interface {
 }
 
 // PathSecurity is the security information use by the middleware
+// There are assign to the WPath and child IPath. The WPath security
+// if not null is apply to the IPath that have a null security
+// is wpath security is nil the security only apply to the path
+// that are not nil
 type PathSecurity struct {
 	RoleRequired Role
 	Owner        string
@@ -68,74 +72,71 @@ func ValidUserCookie(r *http.Request) (*User, error) {
 
 // RedirectTo redirect to an url with the structure given as query
 func RedirectTo(w http.ResponseWriter, r *http.Request, dest string, data interface{}) {
-	queryParam, err := conv.StructToQuery(data)
-	if err != nil {
-		print("Error redirect " + err.Error())
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+	if data != nil {
+		queryParam, err := conv.StructToQuery(data)
+		if err != nil {
+			print("Error redirect " + err.Error())
+			http.Redirect(w, r, "/", http.StatusSeeOther)
+		}
+		dest += queryParam
 	}
-	dest += queryParam
 	http.Redirect(w, r, dest, http.StatusSeeOther)
 }
 
-// GetMiddlewareCustom create a custom middleware that handle this path
-func GetMiddlewareCustom(ps *PathSecurity) func(http.Handler) http.Handler {
-
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Regarde si authentifier
-			user, err := ValidUserCookie(r)
-			if err != nil {
-				// redirige vers login avec message d'erreur et l'url qu'on voulait allez
-				rl := &RedirectLogin{
-					Message: err.Error(),
-					URL:     r.URL.String(),
-				}
-				RedirectTo(w, r, "/auth/login", rl)
-				return
-			}
-
-			var errAccess *DeniedAccess
-			// valide que le token est encore bon
-
-			// Valide que le role est correcte
-			if !IsOneSet(ps.RoleRequired, user.Role) {
-				errAccess = &DeniedAccess{
-					BadField: "role",
-					Message:  "Role incorrect",
-				}
-			}
-			// Regarde s'il s'agit d'un usager ou group ou autre
-			var right Right
-			var needed Right
-			if user.Username == ps.Owner {
-				right = ps.Right[0]
-			} else if InGroup(user, ps.Group) {
-				right = ps.Right[1]
-			} else {
-				right = ps.Right[2]
-			}
-			// Regarde le type de request et regarde si on peut la faire avec les droits
-			switch r.Method {
-			case "GET":
-				needed = RightRead
-			case "POST", "PUT", "DELETE":
-				needed = RightWrite
-			default:
-				needed = RightExecute
-			}
-			if !right.Have(needed) {
-				errAccess = &DeniedAccess{
-					BadField: "right",
-					Message:  fmt.Sprintf("Your right are %v but needed %v", right, needed),
-				}
-			}
-
-			if errAccess != nil {
-				RedirectTo(w, r, "/denied", errAccess)
-				return
-			}
-
-			next.ServeHTTP(w, r)
-		})
+// PathSecurityValidation valid the path access
+func PathSecurityValidation(ps *PathSecurity, w http.ResponseWriter, r *http.Request) bool {
+	// Regarde si authentifier
+	user, err := ValidUserCookie(r)
+	if err != nil {
+		// redirige vers login avec message d'erreur et l'url qu'on voulait allez
+		rl := &RedirectLogin{
+			Message: err.Error(),
+			URL:     r.URL.String(),
+		}
+		RedirectTo(w, r, "/auth/login", rl)
+		return false
 	}
+
+	var errAccess *DeniedAccess
+	// valide que le token est encore bon
+
+	// Valide que le role est correcte
+	if !IsOneSet(ps.RoleRequired, user.Role) {
+		errAccess = &DeniedAccess{
+			BadField: "role",
+			Message:  "Role incorrect",
+		}
+	}
+	// Regarde s'il s'agit d'un usager ou group ou autre
+	var right Right
+	var needed Right
+	if user.Username == ps.Owner {
+		right = ps.Right[0]
+	} else if InGroup(user, ps.Group) {
+		right = ps.Right[1]
+	} else {
+		right = ps.Right[2]
+	}
+	// Regarde le type de request et regarde si on peut la faire avec les droits
+	switch r.Method {
+	case "GET":
+		needed = RightRead
+	case "POST", "PUT", "DELETE":
+		needed = RightWrite
+	default:
+		needed = RightExecute
+	}
+	if !right.Have(needed) {
+		errAccess = &DeniedAccess{
+			BadField: "right",
+			Message:  fmt.Sprintf("Your right are %v but needed %v", right, needed),
+		}
+	}
+
+	if errAccess != nil {
+		RedirectTo(w, r, "/denied", errAccess)
+		return false
+	}
+
+	return true
 }

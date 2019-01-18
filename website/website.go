@@ -149,6 +149,7 @@ func (w *WebServer) Setup(configWs *config.WebSite) error {
 	w.Hs.Handler = w.Mux
 
 	for k, v := range w.Config.EnableModule {
+		w.Logger.Printf("Starting enabling module %v with saved context %v\n", k, v)
 		if module := config.GetModule(k); module != nil {
 			if v != nil {
 				vv := v.(map[string]interface{})
@@ -167,18 +168,22 @@ func (w *WebServer) Setup(configWs *config.WebSite) error {
 			}
 			widgets := module.GetWidgets()
 			for _, widg := range widgets {
+				w.Logger.Printf("Adding widget %v\n", widg.Name)
 				w.Widgets[widg.Name] = widg
 			}
 			tasks := module.GetTasks()
 			for _, t := range tasks {
+				w.Logger.Printf("Adding task %v\n", t.GetName())
 				w.TaskPool.Tasks[t.GetName()] = t
 			}
 			navItems := module.GetNavigationItems()
 			for _, item := range navItems {
 				switch v := item.(type) {
-				case route.Button:
-					w.NavigationBar.Buttons = append(w.NavigationBar.Buttons, v)
+				case *route.Button:
+					w.Logger.Printf("Adding button to navbar \n")
+					w.NavigationBar.Buttons = append(w.NavigationBar.Buttons, *v)
 				default:
+					w.Logger.Printf("Adding item to navbar \n")
 					w.NavigationBar.Items = append(w.NavigationBar.Items, v)
 				}
 			}
